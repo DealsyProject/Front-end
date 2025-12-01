@@ -8,6 +8,7 @@ import axiosInstance from '../../../Components/utils/axiosInstance';
 const Customers = () => {
   const navigate = useNavigate();
   const [vendorOrders, setVendorOrders] = useState([]);
+  const [invoices, setInvoices] = useState([]); // Added invoices state
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -22,9 +23,10 @@ const Customers = () => {
 
   const activeView = 'customers';
 
-  // Fetch vendor orders
+  // Fetch both vendor orders and invoices
   useEffect(() => {
     fetchVendorOrders();
+    fetchInvoices();
   }, []);
 
   const fetchVendorOrders = async () => {
@@ -33,7 +35,6 @@ const Customers = () => {
       const response = await axiosInstance.get('/Order/vendor/orders');
       console.log('Vendor Orders API Response:', response.data);
 
-      // Handle API response format - vendor orders, not customers
       const ordersData = response.data.orders || response.data || [];
       
       const formattedOrders = ordersData.map(order => ({
@@ -57,12 +58,56 @@ const Customers = () => {
     }
   };
 
-  // Group orders by customer to create customer list
+  // Fetch invoices to get latest statuses
+  const fetchInvoices = async () => {
+    try {
+      const response = await axiosInstance.get('/Order/vendor/invoices');
+      const invoicesData = response.data.invoices || response.data || [];
+      setInvoices(invoicesData);
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      // Continue without invoices if there's an error
+    }
+  };
+
+  // Get the correct order status by checking invoices first, then orders
+  const getCorrectOrderStatus = (orderId) => {
+    // First check if there's an invoice with updated status
+    const invoice = invoices.find(inv => 
+      inv.orderId === orderId || 
+      inv.OrderId === orderId ||
+      (inv.Order && (inv.Order.orderId === orderId || inv.Order.OrderId === orderId))
+    );
+
+    if (invoice) {
+      // Check for confirmation status first (from invoices)
+      if (invoice.ConfirmationStatus) {
+        return invoice.ConfirmationStatus;
+      }
+      if (invoice.confirmationStatus) {
+        return invoice.confirmationStatus;
+      }
+      // Check for order status
+      if (invoice.OrderStatus) {
+        return invoice.OrderStatus;
+      }
+      if (invoice.orderStatus) {
+        return invoice.orderStatus;
+      }
+    }
+
+    // If no invoice or no status in invoice, return order status
+    const order = vendorOrders.find(o => o.orderId === orderId);
+    return order ? order.status : 'Pending';
+  };
+
+  // Group orders by customer with corrected statuses
   const getCustomersFromOrders = () => {
     const customersMap = new Map();
 
     vendorOrders.forEach(order => {
       const customerId = order.customerId;
+      const correctedStatus = getCorrectOrderStatus(order.orderId);
       
       if (!customersMap.has(customerId)) {
         customersMap.set(customerId, {
@@ -79,7 +124,14 @@ const Customers = () => {
       const customer = customersMap.get(customerId);
       customer.totalOrders += 1;
       customer.totalSpent += order.totalAmount;
-      customer.orders.push(order);
+      
+      // Create order object with corrected status
+      const orderWithCorrectedStatus = {
+        ...order,
+        status: correctedStatus
+      };
+      
+      customer.orders.push(orderWithCorrectedStatus);
       
       // Update last order date if this order is newer
       if (new Date(order.orderDate) > new Date(customer.lastOrderDate || 0)) {
@@ -92,38 +144,27 @@ const Customers = () => {
 
   const customers = getCustomersFromOrders();
 
-  // Search customers via API
+  // Handle search
   const handleSearch = async () => {
-    if (!searchTerm.trim()) {
-      return; // No search needed, we're filtering client-side
-    }
-
-    try {
-      setLoading(true);
-      // Filter client-side since we don't have a search endpoint
-      const filtered = customers.filter(customer =>
-        customer.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      // Note: We can't setCustomers since it's derived from vendorOrders
-      // The search will be handled in the filteredCustomers calculation
-    } catch (error) {
-      console.error('Error searching customers:', error);
-      toast.error('Search failed');
-    } finally {
-      setLoading(false);
-    }
+    if (!searchTerm.trim()) return;
+    // Search is handled client-side in filteredCustomers
   };
 
   const handleCustomerSelect = (customer) => {
     setSelectedOrder(customer);
+    
+    // Get statuses with corrected order statuses
+    const orders = customer.orders || [];
     const stats = {
       totalOrders: customer.totalOrders || 0,
-      completedOrders: (customer.orders || []).filter(o => 
-        ['Completed', 'Delivered', 'Confirmed'].includes(o.status || o.Status)
+      completedOrders: orders.filter(o => 
+        ['Completed', 'Delivered', 'Confirmed', 'Paid', 'Paided'].includes(o.status)
       ).length,
-      pendingOrders: (customer.orders || []).filter(o => 
-        ['Pending', 'Processing'].includes(o.status || o.Status)
+      pendingOrders: orders.filter(o => 
+        ['Pending', 'Processing'].includes(o.status)
+      ).length,
+      returnedOrders: orders.filter(o => 
+        ['Returned', 'Refunded'].includes(o.status)
       ).length,
       totalSpent: customer.totalSpent || 0,
       averageOrderValue: (customer.totalOrders || 0) > 0 
@@ -133,6 +174,7 @@ const Customers = () => {
     setCustomerStats(stats);
   };
 
+  // Update stats grid to include returned orders
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
@@ -161,20 +203,39 @@ const Customers = () => {
     customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Updated status color mapping to match invoice statuses
   const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
+    if (!status) return 'bg-gray-100 text-gray-800';
+    
+    const statusLower = status.toLowerCase();
+    
+    switch (statusLower) {
       case 'confirmed':
       case 'completed':
+      case 'delivered':
+      case 'paid':
+      case 'paided':
         return 'bg-green-100 text-green-800';
       case 'pending':
+      case 'processing':
         return 'bg-yellow-100 text-yellow-800';
       case 'shipped':
+      case 'in-transit':
         return 'bg-blue-100 text-blue-800';
       case 'cancelled':
         return 'bg-red-100 text-red-800';
+      case 'returned':
+      case 'refunded':
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  // Refresh all data
+  const handleRefresh = () => {
+    fetchVendorOrders();
+    fetchInvoices();
   };
 
   return (
@@ -205,12 +266,13 @@ const Customers = () => {
               Search
             </button>
             <button
-              onClick={fetchVendorOrders}
+              onClick={handleRefresh}
               className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition font-medium"
             >
               Refresh
             </button>
           </div>
+          
         </div>
 
         {loading ? (
@@ -287,17 +349,16 @@ const Customers = () => {
                         <div>
                           <strong>Email:</strong> {selectedOrder.email}
                         </div>
-                        
-                        {/* <div className="md:col-span-2">
-                          <strong>Total Orders:</strong> {selectedOrder.totalOrders}
-                        </div> */}
+                        <div>
+                          <strong>Customer ID:</strong> {selectedOrder.customerId}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Stats Grid */}
+                  {/* Stats Grid - Updated to include returned orders */}
                   {customerStats && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
                       <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-100">
                         <div className="text-2xl font-bold text-blue-600">{customerStats.totalOrders}</div>
                         <div className="text-xs text-blue-800 font-medium">Total Orders</div>
@@ -310,9 +371,14 @@ const Customers = () => {
                         <div className="text-2xl font-bold text-yellow-600">{customerStats.pendingOrders}</div>
                         <div className="text-xs text-yellow-800 font-medium">Pending</div>
                       </div>
+                      
                       <div className="bg-purple-50 p-4 rounded-lg text-center border border-purple-100">
-                        <div className="text-2xl font-bold text-purple-600">{formatCurrency(customerStats.totalSpent)}</div>
-                        <div className="text-xs text-purple-800 font-medium">Total Spent</div>
+                        <div className="text-2xl font-bold text-purple-600">{customerStats.returnedOrders || 0}</div>
+                        <div className="text-xs text-purple-800 font-medium">Returned</div>
+                      </div>
+                      <div className="bg-amber-50 p-4 rounded-lg text-center border border-amber-100">
+                        <div className="text-2xl font-bold text-amber-600">{formatCurrency(customerStats.totalSpent)}</div>
+                        <div className="text-xs text-amber-800 font-medium">Total amount</div>
                       </div>
                     </div>
                   )}
@@ -333,11 +399,11 @@ const Customers = () => {
                     {(selectedOrder.orders || []).length > 0 ? (
                       <div className="space-y-4 max-h-96 overflow-y-auto">
                         {selectedOrder.orders.map((order, index) => {
-                          const orderStatus = order.status || order.Status || 'Unknown';
-                          const orderId = order.orderId || order.OrderId || order.id || `order-${index}`;
-                          const totalAmount = order.totalAmount || order.TotalAmount || 0;
-                          const orderDate = order.orderDate || order.OrderDate || order.createdOn || order.CreatedOn;
-                          const orderItems = order.items || order.Items || [];
+                          const orderStatus = order.status || 'Unknown';
+                          const orderId = order.orderId || `order-${index}`;
+                          const totalAmount = order.totalAmount || 0;
+                          const orderDate = order.orderDate;
+                          const orderItems = order.items || [];
 
                           return (
                             <div key={orderId} className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition">

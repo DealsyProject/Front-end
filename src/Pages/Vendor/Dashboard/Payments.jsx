@@ -11,12 +11,9 @@ const Payments = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [refundFilter, setRefundFilter] = useState('all');
-  const [methodFilter, setMethodFilter] = useState('all');
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [stats, setStats] = useState(null);
-  const [processingRefund, setProcessingRefund] = useState(null);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
@@ -32,53 +29,54 @@ const Payments = () => {
   }, []);
 
   const fetchPayments = async () => {
-  try {
-    setLoading(true);
-    const response = await axiosInstance.get('/Payment/vendor/payments');
-    const rawPayments = response.data.payments || [];
+    try {
+      setLoading(true);
+      const response = await axiosInstance.get('/Payment/vendor/payments');
+      const rawPayments = response.data.payments || [];
 
-    // Transform data to match frontend structure - FIXED FIELD MAPPING
-    const paymentsData = rawPayments.map(payment => ({
-      paymentId: payment.PaymentId || payment.paymentId || payment.id,
-      date: payment.Date || payment.date || payment.createdOn,
-      amount: Number(payment.Amount || payment.amount) || 0,
-      method: payment.Method || payment.method || 'razorpay', // Use actual method from API
-      status: payment.Status || payment.status || 'completed',
-      transactionId: payment.TransactionId || payment.transactionId || payment.razorpayPaymentId || 'N/A',
-      invoiceId: payment.InvoiceId || payment.invoiceId || 'N/A',
-      orderId: payment.OrderId || payment.orderId,
-      isRefunded: payment.IsRefunded || payment.isRefunded || false,
-      refundId: payment.RefundId || payment.refundId || null,
-      refundDate: payment.RefundDate || payment.refundDate || null,
-      refundReason: payment.RefundReason || payment.refundReason || null,
-      customer: {
-        id: payment.Customer?.Id || payment.customer?.id,
-        name: payment.Customer?.Name || payment.customer?.name || 'Unknown Customer',
-        email: payment.Customer?.Email || payment.customer?.email || 'N/A',
-        phone: payment.Customer?.Phone || payment.customer?.phone || 'N/A',
-        address: payment.Customer?.Address || payment.customer?.address || 'N/A',
-        pincode: payment.Customer?.Pincode || payment.customer?.pincode || 'N/A',
-      },
-      items: (payment.Items || payment.items || []).map(item => ({
-        productName: item.ProductName || item.productName || 'Unknown Product',
-        productImage: item.ProductImage || item.productImage || null,
-        quantity: item.Quantity || item.quantity || 1,
-        price: Number(item.Price || item.price) || 0,
-        total: Number(item.Total || item.total) || 0,
-      })),
-      orderDate: payment.OrderDate || payment.orderDate || null,
-    }));
+      // Transform data to match frontend structure
+      const paymentsData = rawPayments.map(payment => ({
+        paymentId: payment.PaymentId || payment.paymentId || payment.id,
+        date: payment.Date || payment.date || payment.createdOn,
+        amount: Number(payment.Amount || payment.amount) || 0,
+        method: payment.Method || payment.method || 'razorpay',
+        status: payment.Status || payment.status || 'completed',
+        transactionId: payment.TransactionId || payment.transactionId || payment.razorpayPaymentId || 'N/A',
+        invoiceId: payment.InvoiceId || payment.invoiceId || 'N/A',
+        orderId: payment.OrderId || payment.orderId,
+        isRefunded: payment.IsRefunded || payment.isRefunded || false,
+        refundId: payment.RefundId || payment.refundId || null,
+        refundDate: payment.RefundDate || payment.refundDate || null,
+        refundReason: payment.RefundReason || payment.refundReason || null,
+        customer: {
+          id: payment.Customer?.Id || payment.customer?.id,
+          name: payment.Customer?.Name || payment.customer?.name || 'Unknown Customer',
+          email: payment.Customer?.Email || payment.customer?.email || 'N/A',
+          phone: payment.Customer?.Phone || payment.customer?.phone || 'N/A',
+          address: payment.Customer?.Address || payment.customer?.address || 'N/A',
+          pincode: payment.Customer?.Pincode || payment.customer?.pincode || 'N/A',
+        },
+        items: (payment.Items || payment.items || []).map(item => ({
+          productName: item.ProductName || item.productName || 'Unknown Product',
+          productImage: item.ProductImage || item.productImage || null,
+          quantity: item.Quantity || item.quantity || 1,
+          price: Number(item.Price || item.price) || 0,
+          total: Number(item.Total || item.total) || 0,
+        })),
+        orderDate: payment.OrderDate || payment.orderDate || null,
+      }));
 
-    setPayments(paymentsData);
-    calculateStatistics(paymentsData);
-  } catch (error) {
-    console.error('Error fetching payments:', error);
-    toast.error('Failed to load payments');
-    setPayments([]);
-  } finally {
-    setLoading(false);
-  }
-};
+      setPayments(paymentsData);
+      calculateStatistics(paymentsData);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      toast.error('Failed to load payments');
+      setPayments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const calculateStatistics = (paymentData) => {
     const completedPayments = paymentData.filter(p => ['Completed', 'Confirmed', 'Captured'].includes(p.status));
     const totalRevenue = completedPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -93,92 +91,26 @@ const Payments = () => {
     });
   };
 
-  const handleRefundAction = async (payment) => {
-  if (!payment.isRefunded) {
-    // Handle both lowercase and capitalized status values
-    const eligibleStatuses = ['completed', 'Completed', 'confirmed', 'Confirmed', 'captured', 'Captured'];
-    if (!eligibleStatuses.includes(payment.status)) {
-      toast.error("Refund only allowed for Completed or Confirmed payments.");
-      return;
-    }
-
-    const reason = prompt("Enter refund reason:", "Customer request");
-    if (!reason) return;
-
-    try {
-      setProcessingRefund(payment.paymentId);
-      
-      const refundResponse = await axiosInstance.post('/Payment/refund', {
-        orderId: payment.orderId,
-        paymentId: payment.transactionId,
-        amount: payment.amount,
-        reason: reason
-      });
-
-      if (refundResponse.data.success) {
-        toast.success('Refund initiated successfully!');
-        fetchPayments(); // Refresh data
-      } else {
-        toast.error(refundResponse.data.message || 'Failed to process refund');
-      }
-    } catch (error) {
-      console.error('Refund error:', error);
-      toast.error(error.response?.data?.message || 'Failed to process refund');
-    } finally {
-      setProcessingRefund(null);
-    }
-  }
-};
- const paymentMethods = {
-  'razorpay': { name: 'Razorpay', icon: '💳', color: 'bg-purple-100 text-purple-800' },
-  'Credit Card': { name: 'Credit Card', icon: '💳', color: 'bg-purple-100 text-purple-800' },
-  'Debit Card': { name: 'Debit Card', icon: '💳', color: 'bg-blue-100 text-blue-800' },
-  'UPI': { name: 'UPI', icon: '📱', color: 'bg-green-100 text-green-800' },
-  'Bank Transfer': { name: 'Bank Transfer', icon: '🏦', color: 'bg-indigo-100 text-indigo-800' },
-  'Cash': { name: 'Cash', icon: '💵', color: 'bg-yellow-100 text-yellow-800' },
-  'Wallet': { name: 'Wallet', icon: '👛', color: 'bg-orange-100 text-orange-800' },
-};
-
   const paymentStatusConfig = {
-  completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
-  Completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
-  confirmed: { color: 'bg-emerald-100 text-emerald-800', label: 'Confirmed' },
-  Confirmed: { color: 'bg-emerald-100 text-emerald-800', label: 'Confirmed' },
-  captured: { color: 'bg-green-100 text-green-800', label: 'Captured' },
-  Captured: { color: 'bg-green-100 text-green-800', label: 'Captured' },
-  pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
-  Pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
-  processing: { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
-  Processing: { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
-  failed: { color: 'bg-red-100 text-red-800', label: 'Failed' },
-  Failed: { color: 'bg-red-100 text-red-800', label: 'Failed' },
-  refunded: { color: 'bg-orange-100 text-orange-800', label: 'Refunded' },
-  Refunded: { color: 'bg-orange-100 text-orange-800', label: 'Refunded' },
-};
-
-  const refundConfig = {
-    true: { color: 'bg-red-100 text-red-800', label: 'Refunded' },
-    false: { color: 'bg-green-100 text-green-800', label: 'Not Refunded' },
+    completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
+    Completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
+    confirmed: { color: 'bg-emerald-100 text-emerald-800', label: 'Confirmed' },
+    Confirmed: { color: 'bg-emerald-100 text-emerald-800', label: 'Confirmed' },
+    captured: { color: 'bg-green-100 text-green-800', label: 'Captured' },
+    Captured: { color: 'bg-green-100 text-green-800', label: 'Captured' },
+    pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+    Pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+    processing: { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
+    Processing: { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
+    failed: { color: 'bg-red-100 text-red-800', label: 'Failed' },
+    Failed: { color: 'bg-red-100 text-red-800', label: 'Failed' },
+    refunded: { color: 'bg-orange-100 text-orange-800', label: 'Refunded' },
+    Refunded: { color: 'bg-orange-100 text-orange-800', label: 'Refunded' },
   };
 
   const PaymentStatusBadge = ({ status }) => {
     const config = paymentStatusConfig[status] || { color: 'bg-gray-100 text-gray-800', label: status };
     return <span className={`px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>{config.label}</span>;
-  };
-
-  const RefundBadge = ({ isRefunded }) => {
-    const config = refundConfig[isRefunded];
-    return <span className={`px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>{config.label}</span>;
-  };
-
-  const MethodBadge = ({ method }) => {
-    const config = paymentMethods[method] || paymentMethods['Credit Card'];
-    return (
-      <span className={`px-3 py-1 rounded-full text-sm font-medium ${config.color} flex items-center space-x-1`}>
-        <span>{config.icon}</span>
-        <span>{config.name}</span>
-      </span>
-    );
   };
 
   const filteredPayments = payments.filter(payment => {
@@ -191,12 +123,8 @@ const Payments = () => {
       payment.invoiceId?.toLowerCase().includes(search);
 
     const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
-    const matchesRefund = refundFilter === 'all' ||
-      (refundFilter === 'refunded' && payment.isRefunded) ||
-      (refundFilter === 'not_refunded' && !payment.isRefunded);
-    const matchesMethod = methodFilter === 'all' || payment.method === methodFilter;
 
-    return matchesSearch && matchesStatus && matchesRefund && matchesMethod;
+    return matchesSearch && matchesStatus;
   });
 
   const handleViewDetails = (payment) => {
@@ -247,7 +175,7 @@ const Payments = () => {
 
             {!loading && stats && (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                   <div className="bg-white rounded-xl shadow-md p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -289,7 +217,7 @@ const Payments = () => {
                       <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-2xl">💸</div>
                     </div>
                   </div>
-                </div>
+                </div> */}
 
                 {/* Filters */}
                 <div className="bg-white rounded-xl shadow-md p-6 mb-6">
@@ -303,28 +231,21 @@ const Payments = () => {
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                     <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg">
-  <option value="all">All Status</option>
-  <option value="confirmed">Confirmed</option>
-  <option value="completed">Completed</option>
-  <option value="captured">Captured</option>
-  <option value="pending">Pending</option>
-  <option value="failed">Failed</option>
-  <option value="refunded">Refunded</option>
-</select>
-                      <select value={refundFilter} onChange={(e) => setRefundFilter(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg">
-                        <option value="all">All Refunds</option>
+                    {/* <div className="w-full lg:w-auto">
+                      <select 
+                        value={statusFilter} 
+                        onChange={(e) => setStatusFilter(e.target.value)} 
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="completed">Completed</option>
+                        <option value="captured">Captured</option>
+                        <option value="pending">Pending</option>
+                        <option value="failed">Failed</option>
                         <option value="refunded">Refunded</option>
-                        <option value="not_refunded">Not Refunded</option>
                       </select>
-                      <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg">
-                        <option value="all">All Methods</option>
-                        {Object.keys(paymentMethods).map(m => (
-                          <option key={m} value={m}>{paymentMethods[m].name}</option>
-                        ))}
-                      </select>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
 
@@ -337,7 +258,6 @@ const Payments = () => {
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Payment Details</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
@@ -346,8 +266,8 @@ const Payments = () => {
                         {filteredPayments.map(payment => (
                           <tr key={payment.paymentId} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{payment.paymentId}</div>
-                              <div className="text-sm text-gray-500">Invoice: {payment.invoiceId}</div>
+                              <div className="text-sm font-medium text-gray-900">Pay-ID</div>
+                             
                               <div className="text-xs text-gray-400">TXN: {payment.transactionId}</div>
                               <div className="text-xs text-gray-500 mt-1">{formatDateTime(payment.date)}</div>
                             </td>
@@ -358,35 +278,23 @@ const Payments = () => {
                             <td className="px-6 py-4">
                               <div className="text-lg font-bold text-gray-900">{formatCurrency(payment.amount)}</div>
                             </td>
-                            <td className="px-6 py-4"><MethodBadge method={payment.method} /></td>
                             <td className="px-6 py-4">
-                              <div className="space-y-1">
-                                <PaymentStatusBadge status={payment.status} />
-                                <RefundBadge isRefunded={payment.isRefunded} />
-                              </div>
+                              <PaymentStatusBadge status={payment.status} />
+                              {payment.isRefunded && (
+                                <div className="mt-1">
+                                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    Refunded
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td className="px-6 py-4">
-                              <div className="flex flex-col space-y-2">
-                                <button 
-                                  onClick={() => handleViewDetails(payment)} 
-                                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                                >
-                                  View Details
-                                </button>
-                                {!payment.isRefunded && ['completed', 'Completed', 'confirmed', 'Confirmed', 'captured', 'Captured'].includes(payment.status) && (
-  <button
-    onClick={() => handleRefundAction(payment)}
-    disabled={processingRefund === payment.paymentId}
-    className={`px-3 py-2 rounded-lg text-sm ${
-      processingRefund === payment.paymentId
-        ? 'bg-gray-400 text-gray-100 cursor-not-allowed'
-        : 'bg-red-600 text-white hover:bg-red-700'
-    }`}
-  >
-    {processingRefund === payment.paymentId ? 'Processing...' : 'Process Refund'}
-  </button>
-)}
-                              </div>
+                              <button 
+                                onClick={() => handleViewDetails(payment)} 
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                              >
+                                View Details
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -419,11 +327,14 @@ const Payments = () => {
 
             <div className="flex justify-between items-start mb-8">
               <div>
-                <h1 className="text-4xl font-bold text-gray-800">{selectedPayment.paymentId}</h1>
+                
                 <div className="flex items-center gap-4 mt-4 flex-wrap">
-                  <PaymentStatusBadge status={selectedPayment.status} />
-                  <RefundBadge isRefunded={selectedPayment.isRefunded} />
-                  <MethodBadge method={selectedPayment.method} />
+                   <h3 className="text-2xl font-bold text-gray-800 mb-5">Payment Information</h3>
+                  {selectedPayment.isRefunded && (
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                      Refunded
+                    </span>
+                  )}
                 </div>
                 {selectedPayment.refundId && (
                   <div className="mt-3 text-sm">
@@ -435,45 +346,37 @@ const Payments = () => {
                   </div>
                 )}
               </div>
-              <div className="text-right">
-                <div className="text-5xl font-bold text-gray-800">{formatCurrency(selectedPayment.amount)}</div>
-                <p className="text-lg text-gray-600 mt-2">Amount {selectedPayment.isRefunded ? 'Refunded' : 'Received'}</p>
-              </div>
+              
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
-                <h3 className="text-2xl font-bold text-gray-800 mb-5">Payment Information</h3>
+               
                 <div className="space-y-4 text-base">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Transaction ID</span>
                     <span className="font-mono font-semibold">{selectedPayment.transactionId}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Invoice ID</span>
-                    <span className="font-semibold">{selectedPayment.invoiceId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Order ID</span>
-                    <span className="font-semibold">{selectedPayment.orderId}</span>
-                  </div>
+                
+                  
                   <div className="flex justify-between">
                     <span className="text-gray-600">Payment Date</span>
                     <span className="font-semibold">{formatDateTime(selectedPayment.date)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Order Date</span>
-                    <span className="font-semibold">{formatDateTime(selectedPayment.orderDate)}</span>
-                  </div>
+                
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Payment Method</span>
-                    <MethodBadge method={selectedPayment.method} />
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                      {selectedPayment.method}
+                    </span>
+                     <span className="px-3">Status:  <PaymentStatusBadge status={selectedPayment.status} /></span>
                   </div>
+                 
                 </div>
               </div>
 
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                <h3 className="text-2xl font-bold text-gray-800 mb-5">Customer Details</h3>
+                
                 <div className="space-y-4">
                   <div>
                     <p className="text-2xl font-bold text-gray-800">{selectedPayment.customer.name}</p>
@@ -523,22 +426,6 @@ const Payments = () => {
                 ))}
               </div>
             </div>
-
-            {!selectedPayment.isRefunded && ['Completed', 'Confirmed', 'Captured'].includes(selectedPayment.status) && (
-              <div className="flex justify-center pt-8 border-t border-gray-200">
-                <button
-                  onClick={() => handleRefundAction(selectedPayment)}
-                  disabled={processingRefund === selectedPayment.paymentId}
-                  className={`px-12 py-4 rounded-xl text-xl font-bold transition-all transform hover:scale-105 shadow-xl ${
-                    processingRefund === selectedPayment.paymentId
-                      ? 'bg-gray-400 text-gray-100 cursor-not-allowed'
-                      : 'bg-red-600 text-white hover:bg-red-700'
-                  }`}
-                >
-                  {processingRefund === selectedPayment.paymentId ? 'Processing Refund...' : 'Process Refund'}
-                </button>
-              </div>
-            )}
           </div>
         )}
 

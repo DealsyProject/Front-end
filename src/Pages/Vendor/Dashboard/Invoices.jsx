@@ -37,7 +37,6 @@ const Invoices = () => {
     items: []
   });
 
-  // Company return address
   const returnAddress = {
     name: 'Dealsy Furniture',
     street: '123 Furniture Plaza, Andheri East',
@@ -50,13 +49,13 @@ const Invoices = () => {
   };
 
   useEffect(() => {
-  const fetchData = async () => {
-    await fetchVendorOrders(); // First fetch orders
-    await fetchInvoices(); // Then fetch invoices (with orders data available)
-    fetchReturns();
-  };
-  fetchData();
-}, []);
+    const fetchData = async () => {
+      await fetchVendorOrders();
+      await fetchInvoices();
+      fetchReturns();
+    };
+    fetchData();
+  }, []);
 
   const fetchVendorOrders = async () => {
     try {
@@ -64,9 +63,6 @@ const Invoices = () => {
       const response = await axiosInstance.get('/Order/vendor/orders');
       const ordersData = response.data.orders || [];
       
-      console.log('Raw orders data:', ordersData); // Debug log
-      
-      // Transform the data to match your frontend structure
       const transformedOrders = ordersData.map(order => ({
         ...order,
         orderId: order.OrderId || order.orderId || order.id,
@@ -77,13 +73,11 @@ const Invoices = () => {
         status: order.Status || order.status || 'Pending',
         orderDate: order.OrderDate || order.orderDate || order.createdOn,
         items: order.Items || order.items || [],
-        // Add deliveryStatus based on order status
         deliveryStatus: getDeliveryStatus(order.Status || order.status),
         trackingNumber: order.TrackingNumber || order.trackingNumber || '',
         carrierName: order.CarrierName || order.carrierName || ''
       }));
       
-      console.log('Transformed orders:', transformedOrders); // Debug log
       setPurchaseOrders(transformedOrders);
     } catch (error) {
       console.error('Error fetching vendor orders:', error);
@@ -93,7 +87,6 @@ const Invoices = () => {
     }
   };
 
-  // Helper function to map backend status to frontend delivery status
   const getDeliveryStatus = (status) => {
     if (!status) return 'pending';
     
@@ -112,116 +105,112 @@ const Invoices = () => {
     }
   };
 
- const fetchInvoices = async () => {
-  try {
-    const response = await axiosInstance.get('/Order/vendor/invoices');
-    const invoicesData = response.data.invoices || response.data || [];
-    console.log('Raw invoices data:', invoicesData);
+  const fetchInvoices = async () => {
+    try {
+      const response = await axiosInstance.get('/Order/vendor/invoices');
+      const invoicesData = response.data.invoices || response.data || [];
+      
+      const transformedInvoices = invoicesData.map(invoice => {
+        const orderData = invoice.Order || invoice.order || {};
+        const items = invoice.Items || invoice.items || orderData.Items || orderData.items || [];
+        const orderId = orderData.OrderId || orderData.orderId || invoice.OrderId;
+        const relatedOrder = purchaseOrders.find(po => po.orderId == orderId);
 
-    const transformedInvoices = invoicesData.map(invoice => {
-      const orderData = invoice.Order || invoice.order || {};
-      const items = invoice.Items || invoice.items || orderData.Items || orderData.items || [];
-      const orderId = orderData.OrderId || orderData.orderId || invoice.OrderId;
-      const relatedOrder = purchaseOrders.find(po => po.orderId == orderId);
-
-      // FIX: Determine status from invoice data FIRST, then order
-      let orderStatus = 'Pending';
-      let deliveryStatus = 'pending';
-
-      // Check for Delivered status first (highest priority)
-      if (invoice.DeliveredDate || invoice.deliveredDate) {
-        orderStatus = 'Delivered';
-        deliveryStatus = 'delivered';
-      } 
-      // Then check for Shipped status
-      else if (invoice.TrackingNumber || invoice.trackingNumber) {
-        orderStatus = 'Shipped';
-        deliveryStatus = 'in-transit';
-      }
-      // Fall back to order data if available
-      else if (relatedOrder) {
-        orderStatus = relatedOrder.status;
-        deliveryStatus = relatedOrder.deliveryStatus;
-      }
-
-      return {
-        invoiceId: invoice.InvoiceId || invoice.invoiceId,
-        invoiceNumber: invoice.InvoiceNumber || invoice.invoiceNumber,
-        invoiceDate: invoice.InvoiceDate || invoice.invoiceDate,
-        amount: invoice.Amount || invoice.amount || 0,
-        carrierName: invoice.CarrierName || invoice.carrierName,
-        trackingNumber: invoice.TrackingNumber || invoice.trackingNumber,
-        // CRITICAL: Include DeliveredDate from invoice
-        deliveredDate: invoice.DeliveredDate || invoice.deliveredDate,
-        orderId: orderId,
-        customer: {
-          name: orderData.CustomerName || orderData.customerName || invoice.CustomerName || 'Unknown Customer',
-          email: orderData.CustomerEmail || orderData.customerEmail || invoice.CustomerEmail || ''
-        },
-        // Store order status in invoice
-        orderStatus: orderStatus,
-        deliveryStatus: deliveryStatus,
-        Items: items.map(item => ({
-          ProductId: item.ProductId || item.productId,
-          ProductName: item.ProductName || item.productName,
-          Quantity: item.Quantity || item.quantity,
-          Price: item.Price || item.price
-        })),
-        id: invoice.InvoiceId || invoice.invoiceId,
-        date: invoice.InvoiceDate || invoice.invoiceDate,
-        shipment: {
-          carrier: invoice.CarrierName || invoice.carrierName,
-          trackingNumber: invoice.TrackingNumber || invoice.trackingNumber
+        // Use stored statuses from backend
+        const orderStatus = invoice.OrderStatus || 'Pending';
+        const confirmationStatus = invoice.ConfirmationStatus || 'Pending';
+        
+        // Determine delivery status from stored order status
+        let deliveryStatus = 'pending';
+        if (orderStatus.toLowerCase() === 'delivered') {
+          deliveryStatus = 'delivered';
+        } else if (orderStatus.toLowerCase() === 'shipped') {
+          deliveryStatus = 'in-transit';
+        } else if (relatedOrder) {
+          deliveryStatus = relatedOrder.deliveryStatus;
         }
-      };
-    });
 
-    console.log('Transformed invoices:', transformedInvoices);
-    setInvoices(transformedInvoices);
-  } catch (error) {
-    console.error('Error fetching invoices:', error);
-    toast.error('Failed to load invoices');
-    setInvoices([]);
-  }
-};
+        return {
+          invoiceId: invoice.InvoiceId || invoice.invoiceId,
+          invoiceNumber: invoice.InvoiceNumber || invoice.invoiceNumber,
+          invoiceDate: invoice.InvoiceDate || invoice.invoiceDate,
+          amount: invoice.Amount || invoice.amount || 0,
+          carrierName: invoice.CarrierName || invoice.carrierName,
+          trackingNumber: invoice.TrackingNumber || invoice.trackingNumber,
+          deliveredDate: invoice.DeliveredDate || invoice.deliveredDate,
+          orderId: orderId,
+          customer: {
+            name: orderData.CustomerName || orderData.customerName || invoice.CustomerName || 'Unknown Customer',
+            email: orderData.CustomerEmail || orderData.customerEmail || invoice.CustomerEmail || ''
+          },
+          // Use stored statuses
+          orderStatus: orderStatus,
+          confirmationStatus: confirmationStatus,
+          deliveryStatus: deliveryStatus,
+          Items: items.map(item => ({
+            ProductId: item.ProductId || item.productId,
+            ProductName: item.ProductName || item.productName,
+            Quantity: item.Quantity || item.quantity,
+            Price: item.Price || item.price
+          })),
+          id: invoice.InvoiceId || invoice.invoiceId,
+          date: invoice.InvoiceDate || invoice.invoiceDate,
+          shipment: {
+            carrier: invoice.CarrierName || invoice.carrierName,
+            trackingNumber: invoice.TrackingNumber || invoice.trackingNumber
+          }
+        };
+      });
 
-const markAsDelivered = async (po) => {
-  try {
-    await axiosInstance.post(`/Order/${po.orderId}/deliver`);
-    toast.success('Order marked as delivered');
-    
-    // Immediately update the local state to reflect changes
-    setPurchaseOrders(prev => 
-      prev.map(order => 
-        order.orderId === po.orderId 
-          ? { ...order, status: 'Delivered', deliveryStatus: 'delivered' }
-          : order
-      )
-    );
-    
-    // Update invoices state immediately
-    setInvoices(prev =>
-      prev.map(inv =>
-        inv.orderId === po.orderId
-          ? { ...inv, orderStatus: 'Delivered', deliveryStatus: 'delivered', deliveredDate: new Date().toISOString() }
-          : inv
-      )
-    );
+      setInvoices(transformedInvoices);
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      toast.error('Failed to load invoices');
+      setInvoices([]);
+    }
+  };
 
-    // Then refresh from server after a short delay
-    setTimeout(() => {
-      fetchVendorOrders();
-      fetchInvoices();
-    }, 300);
-  } catch (error) {
-    console.error('Error marking as delivered:', error);
-    toast.error(error.response?.data?.message || 'Failed to update order status');
-  }
-};
+  const markAsDelivered = async (po) => {
+    try {
+      await axiosInstance.post(`/Order/${po.orderId}/deliver`);
+      toast.success('Order marked as delivered');
+      
+      // Update local state
+      setPurchaseOrders(prev => 
+        prev.map(order => 
+          order.orderId === po.orderId 
+            ? { ...order, status: 'Delivered', deliveryStatus: 'delivered' }
+            : order
+        )
+      );
+      
+      // Update invoices state
+      setInvoices(prev =>
+        prev.map(inv =>
+          inv.orderId === po.orderId
+            ? { 
+                ...inv, 
+                orderStatus: 'Delivered', 
+                confirmationStatus: 'Confirmed',
+                deliveryStatus: 'delivered', 
+                deliveredDate: new Date().toISOString() 
+              }
+            : inv
+        )
+      );
+
+      setTimeout(() => {
+        fetchVendorOrders();
+        fetchInvoices();
+      }, 300);
+    } catch (error) {
+      console.error('Error marking as delivered:', error);
+      toast.error(error.response?.data?.message || 'Failed to update order status');
+    }
+  };
+
   const fetchReturns = async () => {
     try {
-      // This would be replaced with actual returns API when available
-      // For now, return empty array
       setReturns([]);
     } catch (error) {
       console.error('Error fetching returns:', error);
@@ -235,9 +224,7 @@ const markAsDelivered = async (po) => {
     navigate('/');
   };
 
-  // Shipment Modal
   const openShipmentModal = (po) => {
-    console.log('Opening shipment modal for:', po); // Debug log
     setSelectedPO(po);
     setShipmentDetails({
       shipmentDate: new Date().toISOString().split('T')[0],
@@ -246,7 +233,7 @@ const markAsDelivered = async (po) => {
       items: po.items?.map(item => ({ 
         ...item, 
         shippedQty: item.Quantity || item.quantity || 0,
-        id: item.ProductId || item.productId, // Use productId as temporary ID
+        id: item.ProductId || item.productId,
         productName: item.ProductName || item.productName,
         quantity: item.Quantity || item.quantity
       })) || []
@@ -267,21 +254,13 @@ const markAsDelivered = async (po) => {
     }
 
     try {
-      // Prepare shipped items for API
       const shippedItems = shipmentDetails.items
         .filter(i => i.shippedQty > 0)
         .map(i => ({
-          orderItemId: i.id, // This should be the order item ID
+          orderItemId: i.id,
           shippedQuantity: i.shippedQty
         }));
 
-      console.log('Shipping order:', selectedPO.orderId, 'with data:', {
-        carrierName: shipmentDetails.carrierName,
-        trackingNumber: shipmentDetails.trackingNumber,
-        shippedItems: shippedItems
-      });
-
-      // Call the correct API endpoint with proper data structure
       await axiosInstance.post(`/Order/${selectedPO.orderId}/ship`, {
         carrierName: shipmentDetails.carrierName,
         trackingNumber: shipmentDetails.trackingNumber,
@@ -290,18 +269,14 @@ const markAsDelivered = async (po) => {
 
       toast.success('Shipment confirmed and invoice generated!');
       setShowShipmentModal(false);
-      fetchVendorOrders(); // Refresh data
-      fetchInvoices(); // Refresh invoices
+      fetchVendorOrders();
+      fetchInvoices();
       setActiveTab('invoices');
     } catch (error) {
       console.error('Error confirming shipment:', error);
       toast.error(error.response?.data?.message || 'Failed to confirm shipment');
     }
   };
-
-  
-
- 
 
   const openReturnModal = (invoice) => {
     const po = purchaseOrders.find(p => p.orderId === invoice.orderId);
@@ -345,7 +320,7 @@ const markAsDelivered = async (po) => {
       const returnedItems = returnDetails.items.filter(i => i.returnedQty > 0);
       const refundAmount = returnedItems.reduce((sum, i) => sum + i.returnedQty * (i.Price || i.price || i.unitPrice || 0), 0);
 
-      // Call API to process return - you'll need to implement this endpoint
+      // Call return API
       await axiosInstance.post('/Payment/refund', {
         orderId: selectedInvoiceForReturn.orderId,
         paymentId: selectedInvoiceForReturn.paymentId,
@@ -355,8 +330,18 @@ const markAsDelivered = async (po) => {
       });
 
       toast.success(`Return processed! ₹${refundAmount.toLocaleString('en-IN')} refunded.`);
+      
+      // Update invoice status to Returned
+      setInvoices(prev =>
+        prev.map(inv =>
+          inv.orderId === selectedInvoiceForReturn.orderId
+            ? { ...inv, confirmationStatus: 'Returned' }
+            : inv
+        )
+      );
+      
       setShowReturnModal(false);
-      fetchReturns(); // Refresh returns data
+      fetchReturns();
     } catch (error) {
       console.error('Error processing return:', error);
       toast.error('Failed to process return');
@@ -387,279 +372,299 @@ const markAsDelivered = async (po) => {
     }
   };
 
- const handlePrintInvoice = (invoice) => {
-  console.log('Invoice data for printing:', invoice); // Debug log
-  
-  // Extract items correctly from the nested structure
-  const items = invoice.Items || invoice.items || invoice.Order?.Items || [];
-  const total = invoice.amount || calculateTotal(items);
-  const invoiceNumber = invoice.InvoiceNumber || invoice.invoiceNumber || invoice.invoiceId || invoice.id;
-  const invoiceDate = invoice.InvoiceDate || invoice.invoiceDate || invoice.date;
-  const po = purchaseOrders.find(p => p.orderId === invoice.orderId);
-  const orderStatus = invoice.orderStatus || po?.status || 'Pending';
-  const deliveryStatus = invoice.deliveryStatus || po?.deliveryStatus || 'pending';
-  
-  // Determine status display
-  const getStatusDisplay = (status, deliveryStatus) => {
-    const statusLower = (status || '').toLowerCase();
-    const deliveryLower = (deliveryStatus || '').toLowerCase();
+  // Simplified invoice status function using stored confirmation status
+  const getInvoiceStatus = (invoice) => {
+    const status = invoice.confirmationStatus || 'Pending';
     
-    if (deliveryLower === 'delivered') return 'Delivered';
-    if (deliveryLower === 'in-transit' || statusLower === 'shipped') return 'Shipped';
-    if (statusLower === 'confirmed') return 'Confirmed';
-    if (statusLower === 'pending') return 'Pending';
-    if (statusLower === 'cancelled') return 'Cancelled';
-    return status || 'Pending';
+    const statusConfig = {
+      'Returned': 'bg-purple-100 text-purple-800',
+      'Confirmed': 'bg-green-100 text-green-800',
+      'Paid': 'bg-green-100 text-green-800',
+      'Paided': 'bg-green-100 text-green-800',
+      'Pending': 'bg-yellow-100 text-yellow-800',
+      'Refunded': 'bg-red-100 text-red-800'
+    };
+    
+    return {
+      text: status,
+      class: statusConfig[status] || 'bg-gray-100 text-gray-800'
+    };
   };
-  
-  const statusDisplay = getStatusDisplay(orderStatus, deliveryStatus);
-  
-  const win = window.open('', '_blank');
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title> ${invoiceNumber}</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            margin: 40px; 
-            line-height: 1.6; 
-            color: #333;
-          }
-          .header { 
-            display: flex; 
-            justify-content: space-between; 
-            border-bottom: 3px solid #6B4E4E; 
-            padding-bottom: 20px; 
-            margin-bottom: 30px;
-          }
-          .logo { 
-            font-size: 32px; 
-            font-weight: bold; 
-            color: #6B4E4E; 
-          }
-          .company-info {
-            text-align: left;
-            font-size: 14px;
-            color: #666;
-          }
-          .invoice-info {
-            background: #f9f9f9;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-          }
-          .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin: 20px 0;
-          }
-          .info-section {
-            margin-bottom: 15px;
-          }
-          .info-label {
-            font-weight: bold;
-            color: #6B4E4E;
-            margin-bottom: 10px;
-          }
-          .tracking { 
-            background: #f0f8ff; 
-            padding: 15px; 
-            border-radius: 8px; 
-            margin: 20px 0;
-            border-left: 4px solid #586330;
-          }
-          .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            margin-left: 10px;
-          }
-          .status-delivered { background: #d1fae5; color: #065f46; }
-          .status-shipped { background: #dbeafe; color: #1e40af; }
-          .status-pending { background: #fef3c7; color: #92400e; }
-          .status-confirmed { background: #d1fae5; color: #065f46; }
-          .status-cancelled { background: #fee2e2; color: #dc2626; }
-          table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin: 30px 0; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          }
-          th { 
-            background: #6B4E4E; 
-            color: white; 
-            padding: 14px; 
-            text-align: left; 
-            font-weight: bold;
-          }
-          td { 
-            padding: 14px; 
-            border-bottom: 1px solid #ddd; 
-          }
-          tr:hover {
-            background: #f8f9fa;
-          }
-          .total-section {
-            text-align: right;
-            margin-top: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-          }
-          .subtotal, .tax, .shipping, .total {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            max-width: 300px;
-            margin-left: auto;
-          }
-          .total { 
-            font-size: 24px; 
-            font-weight: bold; 
-            color: #6B4E4E;
-            border-top: 2px solid #6B4E4E;
-            padding-top: 10px;
-            margin-top: 10px;
-          }
-          .footer {
-            margin-top: 50px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            text-align: center;
-            color: #666;
-            font-size: 12px;
-          }
-          .notes {
-            margin-top: 30px;
-            padding: 15px;
-            background: #fff3cd;
-            border-radius: 5px;
-            border-left: 4px solid #ffc107;
-          }
-        </style>
-      </head>
-      <body>
-        <!-- Header -->
-        <div class="header">
-          <div>
-            <div class="logo"> Dealsy </div>
-            <div class="company-info">
-              123  Plaza, Beach Road <br>
-              Kozhikode, Kerala 400059<br>
-              Phone: +91 8281304925<br>
-              Email: SupportDealsy@gmail.com
-            </div>
-          </div>
-          <div>
-            <div">
-              <div class="info-label">BILL TO</div>
-              <div><strong>${invoice.customer?.name || invoice.Order?.CustomerName || 'N/A'}</strong></div>
-             
-            </div>
-          </div>
-        </div>
 
-        <!-- Order and Customer Information -->
-        <div class="info-grid">
-          <div>
-            
-          </div>
-          
-        </div>
-
-        <!-- Shipping Information -->
-        <div class="tracking">
-          <div class="info-label">SHIPPING INFORMATION</div>
-          <div><strong>Carrier:</strong> ${invoice.CarrierName || invoice.carrierName || invoice.shipment?.carrier || 'N/A'}</div>
-          <div><strong>Tracking Number:</strong> ${invoice.TrackingNumber || invoice.trackingNumber || invoice.shipment?.trackingNumber || 'N/A'}</div>
-         <div><strong>Order Status:</strong>
-              <span class="status-badge ${
-                  statusDisplay.toLowerCase() === 'delivered' ? 'status-delivered' :
-                  statusDisplay.toLowerCase() === 'shipped' ? 'status-shipped' :
-                  statusDisplay.toLowerCase() === 'confirmed' ? 'status-confirmed' :
-                  statusDisplay.toLowerCase() === 'cancelled' ? 'status-cancelled' :
-                  'status-pending'
-                }">${statusDisplay}</span>
+  const handlePrintInvoice = (invoice) => {
+    const items = invoice.Items || invoice.items || invoice.Order?.Items || [];
+    const total = invoice.amount || calculateTotal(items);
+    const invoiceNumber = invoice.InvoiceNumber || invoice.invoiceNumber || invoice.invoiceId || invoice.id;
+    const invoiceDate = invoice.InvoiceDate || invoice.invoiceDate || invoice.date;
+    
+    // Use stored statuses
+    const orderStatus = invoice.orderStatus || 'Pending';
+    const confirmationStatus = invoice.confirmationStatus || 'Pending';
+    
+    const win = window.open('', '_blank');
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice ${invoiceNumber}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 40px; 
+              line-height: 1.6; 
+              color: #333;
+            }
+            .header { 
+              display: flex; 
+              justify-content: space-between; 
+              border-bottom: 3px solid #6B4E4E; 
+              padding-bottom: 20px; 
+              margin-bottom: 30px;
+            }
+            .logo { 
+              font-size: 32px; 
+              font-weight: bold; 
+              color: #6B4E4E; 
+            }
+            .company-info {
+              text-align: left;
+              font-size: 14px;
+              color: #666;
+            }
+            .invoice-info {
+              background: #f9f9f9;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
+              margin: 20px 0;
+            }
+            .info-section {
+              margin-bottom: 15px;
+            }
+            .info-label {
+              font-weight: bold;
+              color: #6B4E4E;
+              margin-bottom: 10px;
+            }
+            .tracking { 
+              background: #f0f8ff; 
+              padding: 15px; 
+              border-radius: 8px; 
+              margin: 20px 0;
+              border-left: 4px solid #586330;
+            }
+            .status-badge {
+              display: inline-block;
+              padding: 4px 12px;
+              border-radius: 20px;
+              font-size: 12px;
+              font-weight: bold;
+              margin-left: 10px;
+            }
+            .status-delivered { background: #d1fae5; color: #065f46; }
+            .status-shipped { background: #dbeafe; color: #1e40af; }
+            .status-pending { background: #fef3c7; color: #92400e; }
+            .status-confirmed { background: #d1fae5; color: #065f46; }
+            .status-cancelled { background: #fee2e2; color: #dc2626; }
+            .status-paid { background: #d1fae5; color: #065f46; }
+            .status-returned { background: #e9d5ff; color: #6b21a8; }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin: 30px 0; 
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            th { 
+              background: #6B4E4E; 
+              color: white; 
+              padding: 14px; 
+              text-align: left; 
+              font-weight: bold;
+            }
+            td { 
+              padding: 14px; 
+              border-bottom: 1px solid #ddd; 
+            }
+            tr:hover {
+              background: #f8f9fa;
+            }
+            .total-section {
+              text-align: right;
+              margin-top: 30px;
+              padding: 20px;
+              background: #f8f9fa;
+              border-radius: 8px;
+            }
+            .subtotal, .tax, .shipping, .total {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 10px;
+              max-width: 300px;
+              margin-left: auto;
+            }
+            .total { 
+              font-size: 24px; 
+              font-weight: bold; 
+              color: #6B4E4E;
+              border-top: 2px solid #6B4E4E;
+              padding-top: 10px;
+              margin-top: 10px;
+            }
+            .footer {
+              margin-top: 50px;
+              padding-top: 20px;
+              border-top: 1px solid #ddd;
+              text-align: center;
+              color: #666;
+              font-size: 12px;
+            }
+            .notes {
+              margin-top: 30px;
+              padding: 15px;
+              background: #fff3cd;
+              border-radius: 5px;
+              border-left: 4px solid #ffc107;
+            }
+          </style>
+        </head>
+        <body>
+          <!-- Header -->
+          <div class="header">
+            <div>
+              <div class="logo">Dealsy</div>
+              <div class="company-info">
+                123 Plaza, Beach Road <br>
+                Kozhikode, Kerala 400059<br>
+                Phone: +91 8281304925<br>
+                Email: SupportDealsy@gmail.com
               </div>
-             
-        </div>
-        
+            </div>
+            <div>
+              <div>
+                <div class="info-label">BILL TO</div>
+                <div><strong>${invoice.customer?.name || invoice.Order?.CustomerName || 'N/A'}</strong></div>
+              </div>
+            </div>
+          </div>
 
-        <!-- Items Table -->
-        <table>
-          <thead>
-            <tr>
-              <th>Product</th>
-              
-              <th>Quantity</th>
-              <th>Unit Price</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items.map(item => {
-              const quantity = item.Quantity || item.quantity || 0;
-              const price = item.Price || item.price || item.unitPrice || 0;
-              const total = quantity * price;
-              const productName = item.ProductName || item.productName || 'Unknown Product';
-              const productId = item.ProductId || item.productId || 'N/A';
-              
-              return `
-                <tr>
-                  <td><strong>${productName}</strong></td>
-                  
-                  <td>${quantity}</td>
-                  <td>₹${price.toLocaleString('en-IN')}</td>
-                  <td><strong>₹${total.toLocaleString('en-IN')}</strong></td>
-                </tr>
-              `;
-            }).join('')}
-            ${items.length === 0 ? `
+          <!-- Invoice Info -->
+          <div class="invoice-info">
+            <div><strong>Invoice Number:</strong> ${invoiceNumber}</div>
+            <div><strong>Invoice Date:</strong> ${formatDate(invoiceDate)}</div>
+            <div><strong>Order Number:</strong> ${invoice.orderId || 'N/A'}</div>
+          </div>
+
+          <!-- Status Information -->
+          <div class="info-grid">
+            <div class="info-section">
+              <div class="info-label">ORDER STATUS</div>
+              <span class="status-badge ${
+                orderStatus.toLowerCase() === 'delivered' ? 'status-delivered' :
+                orderStatus.toLowerCase() === 'shipped' ? 'status-shipped' :
+                orderStatus.toLowerCase() === 'confirmed' ? 'status-confirmed' :
+                orderStatus.toLowerCase() === 'cancelled' ? 'status-cancelled' :
+                'status-pending'
+              }">${orderStatus}</span>
+            </div>
+            <div class="info-section">
+              <div class="info-label">PAYMENT STATUS</div>
+              <span class="status-badge ${
+                confirmationStatus.toLowerCase() === 'confirmed' ? 'status-confirmed' :
+                confirmationStatus.toLowerCase() === 'paid' ? 'status-paid' :
+                confirmationStatus.toLowerCase() === 'returned' ? 'status-returned' :
+                confirmationStatus.toLowerCase() === 'refunded' ? 'status-returned' :
+                'status-pending'
+              }">${confirmationStatus}</span>
+            </div>
+          </div>
+
+          <!-- Shipping Information -->
+          <div class="tracking">
+            <div class="info-label">SHIPPING INFORMATION</div>
+            <div><strong>Carrier:</strong> ${invoice.CarrierName || invoice.carrierName || invoice.shipment?.carrier || 'N/A'}</div>
+            <div><strong>Tracking Number:</strong> ${invoice.TrackingNumber || invoice.trackingNumber || invoice.shipment?.trackingNumber || 'N/A'}</div>
+            ${invoice.deliveredDate ? `<div><strong>Delivered Date:</strong> ${formatDate(invoice.deliveredDate)}</div>` : ''}
+          </div>
+
+          <!-- Items Table -->
+          <table>
+            <thead>
               <tr>
-                <td colspan="5" style="text-align: center; padding: 20px; color: #666;">
-                  No items found in this invoice
-                </td>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
               </tr>
-            ` : ''}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${items.map(item => {
+                const quantity = item.Quantity || item.quantity || 0;
+                const price = item.Price || item.price || item.unitPrice || 0;
+                const total = quantity * price;
+                const productName = item.ProductName || item.productName || 'Unknown Product';
+                
+                return `
+                  <tr>
+                    <td><strong>${productName}</strong></td>
+                    <td>${quantity}</td>
+                    <td>₹${price.toLocaleString('en-IN')}</td>
+                    <td><strong>₹${total.toLocaleString('en-IN')}</strong></td>
+                  </tr>
+                `;
+              }).join('')}
+              ${items.length === 0 ? `
+                <tr>
+                  <td colspan="4" style="text-align: center; padding: 20px; color: #666;">
+                    No items found in this invoice
+                  </td>
+                </tr>
+              ` : ''}
+            </tbody>
+          </table>
 
-       
+          <!-- Total -->
+          <div class="total-section">
+            <div class="total">
+              <span>Total Amount:</span>
+              <span>₹${total.toLocaleString('en-IN')}</span>
+            </div>
+          </div>
 
-        <!-- Notes -->
-        <div class="notes">
-          <strong>Notes:</strong><br>
-          • Thank you for your business!<br>
-          • Please retain this invoice for your records.<br>
-          • For any queries, contact our support Team.
-        </div>
+          <!-- Notes -->
+          <div class="notes">
+            <strong>Notes:</strong><br>
+            • Thank you for your business!<br>
+            • Please retain this invoice for your records.<br>
+            • For any queries, contact our support Team.
+          </div>
 
-        <!-- Footer -->
-        <div class="footer">
-          <p>Dealsy  - Quality Products at Great Prices</p>
-          <p>SupportDealsy@gmail.com | +91 8281304925</p>
-        </div>
-      </body>
-    </html>
-  `);
-  win.document.close();
-  win.focus();
-  setTimeout(() => win.print(), 500);
-};
+          <!-- Footer -->
+          <div class="footer">
+            <p>Dealsy - Quality Products at Great Prices</p>
+            <p>SupportDealsy@gmail.com | +91 8281304925</p>
+          </div>
+        </body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 500);
+  };
+
   const handleSendInvoice = (invoice) => {
-  const total = invoice.amount || calculateTotal(invoice.items);
-  const invoiceNumber = invoice.invoiceNumber || invoice.invoiceId;
-  const subject = `Invoice ${invoiceNumber} - Shipment Confirmed`;
-  const body = `Dear ${invoice.customer?.name || 'Customer'},\n\nYour order has been shipped!\n\nTracking: ${invoice.trackingNumber || invoice.shipment?.trackingNumber || 'N/A'}\nCarrier: ${invoice.carrierName || invoice.shipment?.carrier || 'N/A'}\nInvoice: ${invoiceNumber}\nAmount: ${formatCurrency(total)}\n\nThank you!\nDealsy Team`;
-  window.location.href = `mailto:${invoice.customer?.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  toast.success('Opening email client...');
-};
-  // Filter orders based on status
+    const total = invoice.amount || calculateTotal(invoice.items);
+    const invoiceNumber = invoice.invoiceNumber || invoice.invoiceId;
+    const subject = `Invoice ${invoiceNumber} - Shipment Confirmed`;
+    const body = `Dear ${invoice.customer?.name || 'Customer'},\n\nYour order has been shipped!\n\nTracking: ${invoice.trackingNumber || invoice.shipment?.trackingNumber || 'N/A'}\nCarrier: ${invoice.carrierName || invoice.shipment?.carrier || 'N/A'}\nInvoice: ${invoiceNumber}\nAmount: ${formatCurrency(total)}\n\nThank you!\nDealsy Team`;
+    window.location.href = `mailto:${invoice.customer?.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    toast.success('Opening email client...');
+  };
+
   const pendingOrders = purchaseOrders.filter(po => 
     (po.status === 'Pending' || po.status === 'Confirmed') && 
     po.deliveryStatus !== 'delivered'
@@ -755,7 +760,6 @@ const markAsDelivered = async (po) => {
                           >
                             Ship Order
                           </button>
-                        
                         </td>
                       </tr>
                     ))}
@@ -823,7 +827,6 @@ const markAsDelivered = async (po) => {
                         <th className="px-6 py-4 text-left">Carrier Name</th>
                         <th className="px-6 py-4 text-left">Total</th>
                         <th className="px-6 py-4 text-left">Status</th>
-                        
                       </tr>
                     </thead>
                     <tbody>
@@ -843,7 +846,6 @@ const markAsDelivered = async (po) => {
                               Delivered
                             </span>
                           </td>
-                         
                         </tr>
                       ))}
                     </tbody>
@@ -853,134 +855,98 @@ const markAsDelivered = async (po) => {
             </div>
           )}
 
- {/* Invoices Tab */}
-{!loading && activeTab === 'invoices' && viewMode === 'list' && (
-  <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-    <table className="w-full">
-      <thead className="bg-[#586330] text-white">
-        <tr>
-          <th className="px-6 py-4 text-left">Invoice ID</th>
-          <th className="px-6 py-4 text-left">Order ID</th>
-          <th className="px-6 py-4 text-left">Customer</th>
-          <th className="px-6 py-4 text-left">Amount</th>
-          <th className="px-6 py-4 text-left">Date</th>
-          <th className="px-6 py-4 text-left">Order Status</th>
-          <th className="px-6 py-4 text-left">Confirmation Status</th>
-          <th className="px-6 py-4 text-left">Tracking Id</th>
-          <th className="px-6 py-4 text-left">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {invoices.map(inv => {
-          const po = purchaseOrders.find(p => p.orderId === inv.orderId);
-          const total = inv.amount || calculateTotal(inv.items);
-          
-          // Use the delivery status from the invoice, fallback to purchase order
-          const isDelivered = inv.deliveryStatus === 'delivered' || 
-                             po?.deliveryStatus === 'delivered' || 
-                             inv.orderStatus?.toLowerCase() === 'delivered';
-          
-          // Order Status Badge
-          const orderStatusBadge = {
-            text: inv.orderStatus || 'Pending',
-            class: inv.orderStatus?.toLowerCase() === 'delivered' ? 'bg-green-100 text-green-800' :
-                   inv.orderStatus?.toLowerCase() === 'shipped' ? 'bg-blue-100 text-blue-800' :
-                   inv.orderStatus?.toLowerCase() === 'cancelled' ? 'bg-red-100 text-red-800' :
-                   'bg-yellow-100 text-yellow-800'
-          };
-          
-          // Invoice Status (Paid/Unpaid/Refunded)
-          const getInvoiceStatus = (invoice) => {
-            // Check if there's a return/refund associated
-            const hasReturn = returns.some(ret => ret.orderId === invoice.orderId);
-            if (hasReturn) {
-              return {
-                text: 'Returned',
-                class: 'bg-purple-100 text-purple-800'
-              };
-            }
-            
-            // Check if order is delivered (assume paid upon delivery)
-            if (isDelivered) {
-              return {
-                text: 'Confirmed',
-                class: 'bg-green-100 text-green-800'
-              };
-            }
-            
-            // Check if order is shipped (assume paid)
-            if (inv.deliveryStatus === 'in-transit' || inv.orderStatus?.toLowerCase() === 'shipped') {
-              return {
-                text: 'Paided',
-                class: 'bg-green-100 text-green-800'
-              };
-            }
-            
-           
-          };
-          
-          const invoiceStatus = getInvoiceStatus(inv);
-          
-          return (
-            <tr key={inv.invoiceId} className="border-b hover:bg-[#F5F1E8]">
-              <td className="px-6 py-4 font-medium">{inv.invoiceNumber || inv.invoiceId}</td>
-              <td className="px-6 py-4">Order {inv.orderId}</td>
-              <td className="px-6 py-4">
-                <div>
-                  <div className="font-medium">{inv.customer?.name || 'Unknown Customer'}</div>
-                  <div className="text-sm text-gray-500">{inv.customer?.email}</div>
-                </div>
-              </td>
-              <td className="px-6 py-4 font-bold text-[#586330]">{formatCurrency(total)}</td>
-              <td className="px-6 py-4 text-sm text-gray-600">{formatDate(inv.invoiceDate || inv.date)}</td>
-              <td className="px-6 py-4">
-                <span className={`px-2 py-1 rounded text-xs ${orderStatusBadge.class}`}>
-                  {orderStatusBadge.text}
-                </span>
-              </td>
-              <td className="px-6 py-4">
-                <span className={`px-2 py-1 rounded text-xs ${invoiceStatus.class}`}>
-                  {invoiceStatus.text}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-sm font-mono">{inv.trackingNumber || inv.shipment?.trackingNumber || 'N/A'}</td>
-              <td className="px-6 py-4">
-                <button 
-                  onClick={() => handlePrintInvoice(inv)} 
-                  className="text-white bg-gray-600 px-2 mr-3 hover:underline"
-                >
-                  Print
-                </button>
-                <button 
-                  onClick={() => handleSendInvoice(inv)} 
-                  className="  text-green-600 mt-2 bg-green-100 px-2 mr-3 hover:underline"
-                >
-                  Email
-                </button>
-               
-{invoiceStatus.text === 'Returned' ? (
-  <button 
-    onClick={() => openReturnModal(inv)} 
-    className="text-red-600 hover:underline"
-  >
-    Return
-  </button>
-) : null}
-              </td>
-            </tr>
-          );
-        })}
-        {invoices.length === 0 && (
-          <tr>
-            <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
-              No invoices found. Ship an order to generate invoices.
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
-)}
+          {/* Invoices Tab */}
+          {!loading && activeTab === 'invoices' && viewMode === 'list' && (
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-[#586330] text-white">
+                  <tr>
+                    <th className="px-6 py-4 text-left">Invoice ID</th>
+                    <th className="px-6 py-4 text-left">Order ID</th>
+                    <th className="px-6 py-4 text-left">Customer</th>
+                    <th className="px-6 py-4 text-left">Amount</th>
+                    <th className="px-6 py-4 text-left">Date</th>
+                    <th className="px-6 py-4 text-left">Order Status</th>
+                    <th className="px-6 py-4 text-left">Payment Status</th>
+                    <th className="px-6 py-4 text-left">Tracking Id</th>
+                    <th className="px-6 py-4 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map(inv => {
+                    const total = inv.amount || calculateTotal(inv.items);
+                    
+                    // Order Status Badge
+                    const orderStatusBadge = {
+                      text: inv.orderStatus || 'Pending',
+                      class: inv.orderStatus?.toLowerCase() === 'delivered' ? 'bg-green-100 text-green-800' :
+                             inv.orderStatus?.toLowerCase() === 'shipped' ? 'bg-blue-100 text-blue-800' :
+                             inv.orderStatus?.toLowerCase() === 'cancelled' ? 'bg-red-100 text-red-800' :
+                             'bg-yellow-100 text-yellow-800'
+                    };
+                    
+                    // Payment Status from stored confirmation status
+                    const invoiceStatus = getInvoiceStatus(inv);
+                    
+                    return (
+                      <tr key={inv.invoiceId} className="border-b hover:bg-[#F5F1E8]">
+                        <td className="px-6 py-4 font-medium">{inv.invoiceNumber || inv.invoiceId}</td>
+                        <td className="px-6 py-4">Order {inv.orderId}</td>
+                        <td className="px-6 py-4">
+                          <div>
+                            <div className="font-medium">{inv.customer?.name || 'Unknown Customer'}</div>
+                            <div className="text-sm text-gray-500">{inv.customer?.email}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-[#586330]">{formatCurrency(total)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{formatDate(inv.invoiceDate || inv.date)}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs ${orderStatusBadge.class}`}>
+                            {orderStatusBadge.text}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs ${invoiceStatus.class}`}>
+                            {invoiceStatus.text}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-mono">{inv.trackingNumber || inv.shipment?.trackingNumber || 'N/A'}</td>
+                        <td className="px-6 py-4">
+                          <button 
+                            onClick={() => handlePrintInvoice(inv)} 
+                            className="text-white bg-gray-600 px-2 mr-3 hover:underline"
+                          >
+                            Print
+                          </button>
+                          <button 
+                            onClick={() => handleSendInvoice(inv)} 
+                            className="text-green-600 mt-2 bg-green-100 px-2 mr-3 hover:underline"
+                          >
+                            Email
+                          </button>
+                          {invoiceStatus.text === 'Returned' ? (
+                            <button 
+                              onClick={() => openReturnModal(inv)} 
+                              className="text-red-600 hover:underline"
+                            >
+                              Return
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {invoices.length === 0 && (
+                    <tr>
+                      <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
+                        No invoices found. Ship an order to generate invoices.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Returns Tab */}
           {!loading && activeTab === 'returns' && (
@@ -1077,11 +1043,11 @@ const markAsDelivered = async (po) => {
                           <p className="text-sm text-gray-600">Price: {formatCurrency(item.Price || item.price)}</p>
                         </div>
                         <div className="flex items-center gap-2">
-  <span className="text-sm text-gray-600">Qty:</span>
-  <div className="text-center bg-gray-50">
-    {item.Quantity || item.quantity || 0}
-  </div>
-</div>
+                          <span className="text-sm text-gray-600">Qty:</span>
+                          <div className="text-center bg-gray-50">
+                            {item.Quantity || item.quantity || 0}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

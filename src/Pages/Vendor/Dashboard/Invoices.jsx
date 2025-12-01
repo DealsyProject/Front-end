@@ -116,73 +116,57 @@ const Invoices = () => {
   try {
     const response = await axiosInstance.get('/Order/vendor/invoices');
     const invoicesData = response.data.invoices || response.data || [];
-    
-    console.log('Raw invoices data:', invoicesData); // Debug log
-    
-    // Transform invoice data to match frontend structure
+    console.log('Raw invoices data:', invoicesData);
+
     const transformedInvoices = invoicesData.map(invoice => {
-      // Extract order data if nested
       const orderData = invoice.Order || invoice.order || {};
-      
-      // Extract items from multiple possible locations
       const items = invoice.Items || invoice.items || orderData.Items || orderData.items || [];
-      
-      // Get order ID
       const orderId = orderData.OrderId || orderData.orderId || invoice.OrderId;
-      
-      // Get the corresponding purchase order to determine status
       const relatedOrder = purchaseOrders.find(po => po.orderId == orderId);
-      
-      // **FIX: Get status directly from invoice data first, then fallback to related order**
-      let orderStatus = invoice.OrderStatus || invoice.orderStatus || relatedOrder?.status || 'Pending';
-      let deliveryStatus = invoice.DeliveryStatus || invoice.deliveryStatus || relatedOrder?.deliveryStatus || 'pending';
-      
-      // **FIX: Check for delivered status in invoice data directly**
+
+      // FIX: Determine status from invoice data FIRST, then order
+      let orderStatus = 'Pending';
+      let deliveryStatus = 'pending';
+
+      // Check for Delivered status first (highest priority)
       if (invoice.DeliveredDate || invoice.deliveredDate) {
         orderStatus = 'Delivered';
         deliveryStatus = 'delivered';
-      } else if (invoice.TrackingNumber || invoice.trackingNumber) {
-        // Only set as shipped if not already delivered
-        if (orderStatus !== 'Delivered' && deliveryStatus !== 'delivered') {
-          orderStatus = 'Shipped';
-          deliveryStatus = 'in-transit';
-        }
+      } 
+      // Then check for Shipped status
+      else if (invoice.TrackingNumber || invoice.trackingNumber) {
+        orderStatus = 'Shipped';
+        deliveryStatus = 'in-transit';
       }
-      
+      // Fall back to order data if available
+      else if (relatedOrder) {
+        orderStatus = relatedOrder.status;
+        deliveryStatus = relatedOrder.deliveryStatus;
+      }
+
       return {
-        // Invoice fields
         invoiceId: invoice.InvoiceId || invoice.invoiceId,
         invoiceNumber: invoice.InvoiceNumber || invoice.invoiceNumber,
         invoiceDate: invoice.InvoiceDate || invoice.invoiceDate,
         amount: invoice.Amount || invoice.amount || 0,
-        
-        // Shipment fields
         carrierName: invoice.CarrierName || invoice.carrierName,
         trackingNumber: invoice.TrackingNumber || invoice.trackingNumber,
-        
-        // **FIX: Add delivered date if available**
+        // CRITICAL: Include DeliveredDate from invoice
         deliveredDate: invoice.DeliveredDate || invoice.deliveredDate,
-        
-        // Order fields
         orderId: orderId,
         customer: {
           name: orderData.CustomerName || orderData.customerName || invoice.CustomerName || 'Unknown Customer',
           email: orderData.CustomerEmail || orderData.customerEmail || invoice.CustomerEmail || ''
         },
-        
-        // Order Status - use determined status
+        // Store order status in invoice
         orderStatus: orderStatus,
         deliveryStatus: deliveryStatus,
-        
-        // Items - ensure proper structure
         Items: items.map(item => ({
           ProductId: item.ProductId || item.productId,
           ProductName: item.ProductName || item.productName,
           Quantity: item.Quantity || item.quantity,
           Price: item.Price || item.price
         })),
-        
-        // For backward compatibility with existing frontend
         id: invoice.InvoiceId || invoice.invoiceId,
         date: invoice.InvoiceDate || invoice.invoiceDate,
         shipment: {
@@ -191,13 +175,47 @@ const Invoices = () => {
         }
       };
     });
-    
-    console.log('Transformed invoices:', transformedInvoices); // Debug log
+
+    console.log('Transformed invoices:', transformedInvoices);
     setInvoices(transformedInvoices);
   } catch (error) {
     console.error('Error fetching invoices:', error);
     toast.error('Failed to load invoices');
     setInvoices([]);
+  }
+};
+
+const markAsDelivered = async (po) => {
+  try {
+    await axiosInstance.post(`/Order/${po.orderId}/deliver`);
+    toast.success('Order marked as delivered');
+    
+    // Immediately update the local state to reflect changes
+    setPurchaseOrders(prev => 
+      prev.map(order => 
+        order.orderId === po.orderId 
+          ? { ...order, status: 'Delivered', deliveryStatus: 'delivered' }
+          : order
+      )
+    );
+    
+    // Update invoices state immediately
+    setInvoices(prev =>
+      prev.map(inv =>
+        inv.orderId === po.orderId
+          ? { ...inv, orderStatus: 'Delivered', deliveryStatus: 'delivered', deliveredDate: new Date().toISOString() }
+          : inv
+      )
+    );
+
+    // Then refresh from server after a short delay
+    setTimeout(() => {
+      fetchVendorOrders();
+      fetchInvoices();
+    }, 300);
+  } catch (error) {
+    console.error('Error marking as delivered:', error);
+    toast.error(error.response?.data?.message || 'Failed to update order status');
   }
 };
   const fetchReturns = async () => {
@@ -283,22 +301,7 @@ const Invoices = () => {
 
   
 
- const markAsDelivered = async (po) => {
-  try {
-    await axiosInstance.post(`/Order/${po.orderId}/deliver`);
-    toast.success('Order marked as delivered');
-    
-    // Refresh both orders and invoices to ensure status sync
-    await fetchVendorOrders();
-    // Add a small delay to ensure backend updates are processed
-    setTimeout(() => {
-      fetchInvoices();
-    }, 500);
-  } catch (error) {
-    console.error('Error marking as delivered:', error);
-    toast.error(error.response?.data?.message || 'Failed to update order status');
-  }
-};
+ 
 
   const openReturnModal = (invoice) => {
     const po = purchaseOrders.find(p => p.orderId === invoice.orderId);

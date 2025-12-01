@@ -9,7 +9,7 @@ import axiosInstance from '../../../Components/utils/axiosInstance';
 const Products = () => {
   const navigate = useNavigate();
   const isFetchingRef = useRef(false);
-  
+
   const handleLogout = useCallback(() => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('currentUser');
@@ -18,12 +18,21 @@ const Products = () => {
   }, [navigate]);
 
   const activeView = 'products';
-  const [activeCategory, setActiveCategory] = useState('all');
+
+  // Pagination & filter states
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Server response data
   const [products, setProducts] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -34,11 +43,8 @@ const Products = () => {
     { id: 'Furniture', name: 'Furniture' },
     { id: 'Books', name: 'Books' },
     { id: 'Home Appliance', name: 'Home Appliance' },
-    { id: 'Cloth', name: 'Cloth' }
+    { id: 'Cloth', name: 'Cloth' },
   ];
-
-  // Fixed items per page - you can change this number as needed
-  const itemsPerPage = 6;
 
   const [newProduct, setNewProduct] = useState({
     productName: '',
@@ -47,165 +53,134 @@ const Products = () => {
     quantity: 1,
     productCategory: '',
     images: [],
-    rating: 0
+    rating: 0,
   });
 
-  const handleApiError = useCallback((error, defaultMessage) => {
-    console.error('API Error:', error);
-    
-    if (error.response?.status === 401) {
-      toast.error('Session expired. Please login again.');
-      handleLogout();
-      return;
-    }
-    
-    if (error.response?.status === 403) {
-      toast.error('You do not have permission to perform this action.');
-      return;
-    }
-    
-    const errorMessage = error.response?.data?.message || 
-                        error.response?.data?.errors?.[0]?.errorMessage ||
-                        defaultMessage;
-    toast.error(errorMessage);
-  }, [handleLogout]);
+  const handleApiError = useCallback(
+    (error, defaultMessage) => {
+      console.error('API Error:', error);
 
-  // Helper function to normalize product data from PascalCase to camelCase
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        handleLogout();
+        return;
+      }
+
+      if (error.response?.status === 403) {
+        toast.error('You do not have permission to perform this action.');
+        return;
+      }
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.errors?.[0]?.errorMessage ||
+        defaultMessage;
+      toast.error(errorMessage);
+    },
+    [handleLogout]
+  );
+
+  // Normalize incoming PascalCase → camelCase
   const normalizeProductData = (product) => {
     if (!product) return null;
-    
+
     return {
-      id: product.Id,
+      id: product.Id || product.id,
       vendorId: product.VendorId,
       vendorName: product.VendorName,
       productName: product.ProductName,
       description: product.Description,
       price: product.Price,
       quantity: product.Quantity,
-      rating: product.Rating,
+      rating: product.Rating || 0,
       productCategory: product.ProductCategory,
       createdOn: product.CreatedOn,
       modifiedOn: product.ModifiedOn,
-      images: (product.Images || []).map(image => ({
+      images: (product.ProductImages || product.Images || []).map((image) => ({
         id: image.Id,
-        imageUrl: image.ImageUrl,
+        imageUrl: image.ImageUrl || image.imageUrl,
         imageOrder: image.ImageOrder,
-        isPrimary: image.IsPrimary
-      }))
+        isPrimary: image.IsPrimary,
+      })),
     };
   };
 
+  // Fetch paginated products from new endpoint
   const fetchProducts = useCallback(async () => {
-    if (isFetchingRef.current) {
-      console.log('Already fetching products, skipping...');
-      return;
-    }
-    
+    if (isFetchingRef.current) return;
+
     try {
       isFetchingRef.current = true;
       setLoading(true);
-      console.log('Fetching products from /Product/my-products');
-      
-      const response = await axiosInstance.get('/Product/my-products');
-      console.log('Products API Response:', response.data);
-      
-      const productsData = response.data.products || [];
-      console.log('Products count:', productsData.length);
-      
-      // Normalize the product data from PascalCase to camelCase
-      const normalizedProducts = productsData.map(normalizeProductData);
-      setProducts(normalizedProducts);
-      
-      if (productsData.length === 0) {
+
+      const params = new URLSearchParams({
+        pageNumber: currentPage,
+        pageSize: 6,
+        category: activeCategory === 'all' ? '' : activeCategory,
+        searchTerm: searchTerm.trim(),
+      });
+
+      const response = await axiosInstance.get(
+        `/Product/my-products/paginated?${params.toString()}`
+      );
+
+      const data = response.data; // PaginatedProductResponseDto
+
+      // FIX: Handle both PascalCase and camelCase response properties
+      const productsArray = data.Products || data.products || [];
+      const normalized = productsArray.map(normalizeProductData);
+
+      setProducts(normalized);
+      setTotalPages(data.TotalPages || data.totalPages || 1);
+      setTotalCount(data.TotalCount || data.totalCount || 0);
+      setHasNextPage(data.HasNextPage || data.hasNextPage || false);
+      setHasPreviousPage(data.HasPreviousPage || data.hasPreviousPage || false);
+
+      if (normalized.length === 0 && currentPage === 1) {
         toast.info('No products found. Add your first product!');
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
       handleApiError(error, 'Failed to load products');
       setProducts([]);
+      setTotalPages(1);
+      setTotalCount(0);
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [handleApiError]);
+  }, [currentPage, activeCategory, searchTerm, handleApiError]);
 
+  // Trigger fetch when page/category/search changes
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  const searchProducts = async () => {
-    if (!searchTerm.trim()) {
-      fetchProducts();
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await axiosInstance.get(`/Product/search?searchTerm=${encodeURIComponent(searchTerm)}`);
-      const searchResults = response.data.products || [];
-      
-      // Normalize search results too
-      const normalizedResults = searchResults.map(normalizeProductData);
-      setProducts(normalizedResults);
-      
-      if (searchResults.length === 0) {
-        toast.info('No products found matching your search');
-      }
-    } catch (error) {
-      handleApiError(error, 'Failed to search products');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filter products - now using normalized camelCase properties
-  const filteredProducts = products.filter(product => {
-    if (!product) return false;
-    
-    const productCategory = product.productCategory || '';
-    const productName = product.productName || '';
-    const description = product.description || '';
-    
-    const categoryMatch = activeCategory === 'all' || 
-      productCategory.toLowerCase() === activeCategory.toLowerCase();
-    
-    const searchMatch = 
-      productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      productCategory.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      description.toLowerCase().includes(searchTerm.toLowerCase());
-
-    return categoryMatch && searchMatch;
-  });
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const productsToShow = filteredProducts.slice(startIndex, endIndex);
-
+  // Reset to page 1 when category or search changes
   const handleCategoryFilter = (categoryId) => {
     setActiveCategory(categoryId);
-    setCurrentPage(1); // Reset to first page when category changes
-  };
-
-  const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
+    setCurrentPage(1);
   };
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     if (!e.target.value.trim()) {
-      fetchProducts();
+      setCurrentPage(1);
     }
   };
 
   const handleSearchSubmit = (e) => {
     if (e.key === 'Enter' || e.type === 'click') {
-      setCurrentPage(1); // Reset to first page when searching
-      searchProducts();
+      setCurrentPage(1);
     }
   };
 
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Add / Update / Delete handlers remain the same
   const handleAddProduct = () => {
     setNewProduct({
       productName: '',
@@ -214,70 +189,43 @@ const Products = () => {
       quantity: 1,
       productCategory: '',
       images: [],
-      rating: 0
+      rating: 0,
     });
     setShowAddModal(true);
   };
 
- const handleUpdateProduct = (product) => {
-  console.log('Editing product:', product);
-  setEditingProduct(product);
-  
-  // Extract image URLs from the product's images array
-  const existingImageUrls = (product.images || []).map(img => img.imageUrl);
-  
-  setNewProduct({ 
-    productName: product.productName || '',
-    description: product.description || '',
-    price: product.price || 0,
-    quantity: product.quantity || 1,
-    productCategory: product.productCategory || '',
-    images: existingImageUrls, // Now includes existing image URLs
-    rating: product.rating || 0
-  });
-  setShowUpdateModal(true);
-};
+  const handleUpdateProduct = (product) => {
+    setEditingProduct(product);
+
+    const existingImageUrls = (product.images || []).map((img) => img.imageUrl);
+
+    setNewProduct({
+      productName: product.productName || '',
+      description: product.description || '',
+      price: product.price || 0,
+      quantity: product.quantity || 1,
+      productCategory: product.productCategory || '',
+      images: existingImageUrls, // keep old URLs (backend handles deletion separately if needed)
+      rating: product.rating || 0,
+    });
+    setShowUpdateModal(true);
+  };
 
   const validateProduct = () => {
-    if (!newProduct.productName?.trim()) {
-      toast.error('Product Name is required!');
-      return false;
-    }
-    if (!newProduct.productCategory?.trim()) {
-      toast.error('Category is required!');
-      return false;
-    }
-    if (!newProduct.description?.trim()) {
-      toast.error('Description is required!');
-      return false;
-    }
-    if (newProduct.price <= 0) {
-      toast.error('Price must be greater than 0!');
-      return false;
-    }
-    if (newProduct.quantity < 0) {
-      toast.error('Quantity cannot be negative!');
-      return false;
-    }
-    if (!newProduct.images || newProduct.images.length === 0) {
-      toast.error('At least 1 product image is required!');
-      return false;
-    }
-    if (newProduct.images.length > 3) {
-      toast.error('Maximum 3 images allowed!');
-      return false;
-    }
+    if (!newProduct.productName?.trim()) return toast.error('Product Name is required!'), false;
+    if (!newProduct.productCategory?.trim()) return toast.error('Category is required!'), false;
+    if (!newProduct.description?.trim()) return toast.error('Description is required!'), false;
+    if (newProduct.price <= 0) return toast.error('Price must be > 0!'), false;
+    if (newProduct.quantity < 0) return toast.error('Quantity cannot be negative!'), false;
+    if (newProduct.images.length === 0) return toast.error('At least 1 image required!'), false;
+    if (newProduct.images.length > 3) return toast.error('Maximum 3 images allowed!'), false;
     return true;
   };
 
   const handleSaveNewProduct = async () => {
-    if (!validateProduct()) {
-      return;
-    }
-
+    if (!validateProduct()) return;
     setSaving(true);
     try {
-      // Create FormData for file upload
       const formData = new FormData();
       formData.append('productName', newProduct.productName.trim());
       formData.append('description', newProduct.description.trim());
@@ -286,31 +234,18 @@ const Products = () => {
       formData.append('productCategory', newProduct.productCategory.trim());
       formData.append('rating', parseFloat(newProduct.rating) || 0);
 
-      // Append each image file
-      newProduct.images.forEach((image, index) => {
-        formData.append('images', image);
+      newProduct.images.forEach((img) => {
+        if (img instanceof File) formData.append('images', img);
       });
 
       await axiosInstance.post('/Product/create', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
-      await fetchProducts();
-      
-      setShowAddModal(false);
-      setNewProduct({
-        productName: '',
-        description: '',
-        price: 0,
-        quantity: 1,
-        productCategory: '',
-        images: [],
-        rating: 0
-      });
-      
+
       toast.success('Product added successfully!');
+      setShowAddModal(false);
+      setCurrentPage(1); // go back to first page
+      fetchProducts();
     } catch (error) {
       handleApiError(error, 'Failed to add product');
     } finally {
@@ -319,19 +254,13 @@ const Products = () => {
   };
 
   const handleSaveUpdatedProduct = async () => {
-    if (!validateProduct()) {
-      return;
-    }
-
+    if (!validateProduct()) return;
     setSaving(true);
     try {
       const productId = editingProduct.id;
-      
-      // Create FormData for file upload
       const formData = new FormData();
-      
-      // Add the Id field to satisfy backend validation
-      formData.append('Id', productId.toString());
+
+      formData.append('Id', productId);
       formData.append('productName', newProduct.productName.trim());
       formData.append('description', newProduct.description.trim());
       formData.append('price', parseFloat(newProduct.price));
@@ -339,32 +268,19 @@ const Products = () => {
       formData.append('productCategory', newProduct.productCategory.trim());
       formData.append('rating', parseFloat(newProduct.rating) || 0);
 
-      // Append each image file (if new images are provided)
-      newProduct.images.forEach((image, index) => {
-        formData.append('images', image);
+      // Only append new files (strings = old URLs, File = new)
+      newProduct.images.forEach((img) => {
+        if (img instanceof File) formData.append('images', img);
       });
 
       await axiosInstance.put(`/Product/update/${productId}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
-      await fetchProducts();
-      
+
+      toast.success('Product updated successfully!');
       setShowUpdateModal(false);
       setEditingProduct(null);
-      setNewProduct({
-        productName: '',
-        description: '',
-        price: 0,
-        quantity: 1,
-        productCategory: '',
-        images: [],
-        rating: 0
-      });
-      
-      toast.success('Product updated successfully!');
+      fetchProducts();
     } catch (error) {
       handleApiError(error, 'Failed to update product');
     } finally {
@@ -373,14 +289,12 @@ const Products = () => {
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) {
-      return;
-    }
+    if (!window.confirm('Delete this product permanently?')) return;
 
     try {
       await axiosInstance.delete(`/Product/delete/${productId}`);
-      await fetchProducts();
-      toast.success('Product deleted successfully!');
+      toast.success('Product deleted!');
+      fetchProducts();
     } catch (error) {
       handleApiError(error, 'Failed to delete product');
     }
@@ -388,229 +302,159 @@ const Products = () => {
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    
     if (files.length === 0) return;
 
-    // Check total images won't exceed 3
     if (newProduct.images.length + files.length > 3) {
       toast.error('Maximum 3 images allowed');
       return;
     }
 
-    // Validate each file
-    const validFiles = files.filter(file => {
+    const validFiles = files.filter((file) => {
       if (file.size > 5 * 1024 * 1024) {
-        toast.error(`Image ${file.name} must be less than 5MB`);
+        toast.error(`${file.name} is too large (max 5MB)`);
         return false;
       }
-
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        toast.error(`Please select a valid image file (JPEG, PNG, WebP) for ${file.name}`);
+      if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
+        toast.error(`Invalid file type: ${file.name}`);
         return false;
       }
-
       return true;
     });
 
     if (validFiles.length > 0) {
-      setNewProduct(prev => ({ 
-        ...prev, 
-        images: [...prev.images, ...validFiles] 
+      setNewProduct((prev) => ({
+        ...prev,
+        images: [...prev.images, ...validFiles],
       }));
-      toast.success(`${validFiles.length} image(s) uploaded successfully!`);
+      toast.success(`${validFiles.length} image(s) added`);
     }
-
-    // Reset file input
     e.target.value = '';
   };
 
   const handleRemoveImage = (index) => {
-    setNewProduct(prev => ({
+    setNewProduct((prev) => ({
       ...prev,
-      images: prev.images.filter((_, i) => i !== index)
+      images: prev.images.filter((_, i) => i !== index),
     }));
-    toast.info(`Image ${index + 1} removed`);
+    toast.info('Image removed');
   };
 
-  const formatPrice = (price) => {
-    return `₹${parseFloat(price).toLocaleString('en-IN')}`;
-  };
+  const formatPrice = (price) => `₹${parseFloat(price).toLocaleString('en-IN')}`;
 
-  const renderRating = (rating) => {
-    return (
-      <div className="flex items-center space-x-1">
-        {[...Array(5)].map((_, index) => (
-          <span
-            key={index}
-            className={`text-sm ${
-              index < Math.floor(rating) ? 'text-yellow-400' : 'text-gray-300'
-            }`}
-          >
-            ★
-          </span>
-        ))}
-        <span className="text-xs text-gray-600 ml-1">({rating})</span>
-      </div>
-    );
-  };
+  const renderRating = (rating) => (
+    <div className="flex items-center space-x-1">
+      {[...Array(5)].map((_, i) => (
+        <span
+          key={i}
+          className={`text-sm ${i < Math.floor(rating) ? 'text-yellow-400' : 'text-gray-300'}`}
+        >
+          ★
+        </span>
+      ))}
+      <span className="text-xs text-gray-600 ml-1">({rating})</span>
+    </div>
+  );
 
-  // Generate page numbers for pagination
+  // Pagination UI helpers
   const getPageNumbers = () => {
-    const pageNumbers = [];
-    const maxVisiblePages = 5;
-    
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
-    }
-    
-    return pageNumbers;
+    const pages = [];
+    const max = 5;
+    let start = Math.max(1, currentPage - Math.floor(max / 2));
+    let end = Math.min(totalPages, start + max - 1);
+    if (end - start + 1 < max) start = Math.max(1, end - max + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
   };
 
   const ProductCard = ({ product }) => {
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-    
-    const productImages = product.images || [];
-    const hasMultipleImages = productImages.length > 1;
-    
-    const getImageUrl = (image) => {
-      if (!image) return 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400';
-      return image.imageUrl || 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400';
-    };
+    const images = product.images || [];
+    const hasMultiple = images.length > 1;
 
-    const getPrimaryImage = () => {
-      if (!productImages.length) return 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400';
-      
-      const primaryImage = productImages.find(img => img.isPrimary);
-      if (primaryImage) return getImageUrl(primaryImage);
-      
-      return getImageUrl(productImages[0]);
-    };
+    const getImageUrl = (img) =>
+      img?.imageUrl || 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400';
 
-    const currentImage = productImages[selectedImageIndex];
-    const displayImage = currentImage ? getImageUrl(currentImage) : getPrimaryImage();
-
-    // Now using normalized camelCase properties
-    const productName = product.productName || '';
-    const productCategory = product.productCategory || '';
-    const price = product.price || 0;
-    const rating = product.rating || 0;
-    const description = product.description || '';
-    const quantity = product.quantity || 0;
-    const createdOn = product.createdOn || new Date();
-    const productId = product.id;
+    const primaryImage = images.find((i) => i.isPrimary) || images[0];
+    const displayImage = images[selectedImageIndex] ? getImageUrl(images[selectedImageIndex]) : getImageUrl(primaryImage);
 
     return (
       <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition duration-300 border border-gray-200">
         <div className="h-48 bg-gray-200 overflow-hidden relative group">
-          <img 
+          <img
             src={displayImage}
-            alt={productName}
-            className="w-full h-full object-cover hover:scale-105 transition duration-300"
-            onError={(e) => {
-              e.target.src = 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400';
-            }}
+            alt={product.productName}
+            className="w-full h-full object-cover hover:scale-105 transition"
+            onError={(e) => (e.target.src = 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400')}
           />
-          
-          {hasMultipleImages && (
-            <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
-              {selectedImageIndex + 1}/{productImages.length}
-            </div>
-          )}
-
-          {quantity === 0 && (
-            <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm font-medium">
+          {product.quantity === 0 && (
+            <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm">
               Out of Stock
             </div>
           )}
-
-          {rating > 0 && (
-            <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm">
-              ⭐ {rating.toFixed(1)}
+          {product.rating > 0 && (
+            <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-sm">
+              ⭐ {product.rating.toFixed(1)}
             </div>
           )}
-
-          {hasMultipleImages && (
-            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          {hasMultiple && (
+            <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
+              {selectedImageIndex + 1}/{images.length}
+            </div>
+          )}
+          {hasMultiple && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition">
               <div className="flex gap-2 justify-center">
-                {productImages.map((img, index) => (
+                {images.map((img, i) => (
                   <button
-                    key={img.id || index}
+                    key={img.id || i}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedImageIndex(index);
+                      setSelectedImageIndex(i);
                     }}
-                    className={`w-12 h-12 rounded overflow-hidden transition-all ${
-                      selectedImageIndex === index 
-                        ? 'ring-2 ring-white scale-110' 
-                        : 'opacity-70 hover:opacity-100'
+                    className={`w-12 h-12 rounded overflow-hidden ${
+                      selectedImageIndex === i ? 'ring-2 ring-white scale-110' : 'opacity-70'
                     }`}
                   >
-                    <img
-                      src={getImageUrl(img)}
-                      alt={`Thumbnail ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.src = 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400';
-                      }}
-                    />
+                    <img src={getImageUrl(img)} alt="" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
             </div>
           )}
         </div>
-        
+
         <div className="p-6">
           <div className="flex justify-between items-start mb-3">
-            <h4 className="text-lg font-semibold text-gray-900 line-clamp-2">{productName}</h4>
-            <span className="text-xs text-[#586330] bg-[#586330]/20 px-2 py-1 rounded-full font-medium">
-              {productCategory}
+            <h4 className="text-lg font-semibold text-gray-900 line-clamp-2">
+              {product.productName}
+            </h4>
+            <span className="text-xs text-[#586330] bg-[#586330]/20 px-2 py-1 rounded-full">
+              {product.productCategory}
             </span>
           </div>
-          
+
           <div className="mb-3">
             <span className="text-[#586330] font-bold text-xl">
-              {formatPrice(price)}
+              {formatPrice(product.price)}
             </span>
-            {rating > 0 && (
-              <div className="mt-1">
-                {renderRating(rating)}
-              </div>
-            )}
+            {product.rating > 0 && <div className="mt-1">{renderRating(product.rating)}</div>}
           </div>
-          
-          <p className="text-gray-600 mb-4 text-sm leading-relaxed line-clamp-3">
-            {description}
-          </p>
+
+          <p className="text-gray-600 mb-4 text-sm line-clamp-3">{product.description}</p>
 
           <div className="space-y-2 text-sm text-gray-700 mb-4">
             <div className="flex justify-between">
-              <span className="font-medium">Quantity:</span>
-              <span className={`font-semibold ${
-                quantity > 10 ? 'text-green-600' : 
-                quantity > 0 ? 'text-yellow-600' : 'text-red-600'
-              }`}>
-                {quantity} in stock
+              <span className="font-medium">Stock:</span>
+              <span className={product.quantity > 10 ? 'text-green-600' : product.quantity > 0 ? 'text-yellow-600' : 'text-red-600'}>
+                {product.quantity} left
               </span>
             </div>
             <div className="flex justify-between">
               <span className="font-medium">Images:</span>
-              <span className="text-gray-600">{productImages.length} photo{productImages.length !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-medium">Added:</span>
-              <span>{new Date(createdOn).toLocaleDateString()}</span>
+              <span>{images.length} photo{images.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
-          
+
           <div className="flex space-x-2">
             <button
               onClick={() => handleUpdateProduct(product)}
@@ -619,7 +463,7 @@ const Products = () => {
               Update
             </button>
             <button
-              onClick={() => handleDeleteProduct(productId)}
+              onClick={() => handleDeleteProduct(product.id)}
               className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition font-medium text-sm"
             >
               Delete
@@ -633,12 +477,11 @@ const Products = () => {
   return (
     <div className="flex min-h-screen bg-gray-100">
       <Sidebar handleLogout={handleLogout} activeView={activeView} />
-
       <div className="flex-1 p-6 text-black">
         <header className="mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">My Products</h1>
-            <p className="text-gray-600 mt-2">Manage your product inventory and listings</p>
+            <p className="text-gray-600 mt-2">Manage your product inventory</p>
           </div>
           <button
             onClick={handleAddProduct}
@@ -649,237 +492,166 @@ const Products = () => {
           </button>
         </header>
 
+        {/* Search */}
         <div className="mb-6">
           <div className="flex gap-4">
             <input
               type="text"
-              placeholder="Search products by name, category, or description..."
+              placeholder="Search by name, category, description..."
               value={searchTerm}
               onChange={handleSearchChange}
               onKeyPress={handleSearchSubmit}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330] focus:border-transparent"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330]"
             />
             <button
               onClick={handleSearchSubmit}
-              className="px-6 py-3 bg-[#586330] text-white rounded-lg hover:bg-[#586330]/80 transition font-medium"
+              className="px-6 py-3 bg-[#586330] text-white rounded-lg hover:bg-[#586330]/80 font-medium"
             >
               Search
             </button>
           </div>
         </div>
 
+        {/* Category Filters */}
         <div className="flex gap-4 mb-8 flex-wrap">
-          {categories.map(category => (
+          {categories.map((cat) => (
             <button
-              key={category.id}
-              onClick={() => handleCategoryFilter(category.id)}
-              className={`px-4 py-2 rounded-lg transition duration-200 font-medium ${
-                activeCategory === category.id
-                  ? 'bg-[#586330] text-white hover:bg-[#586330]/80 shadow-md'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+              key={cat.id}
+              onClick={() => handleCategoryFilter(cat.id)}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                activeCategory === cat.id
+                  ? 'bg-[#586330] text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
               }`}
             >
-              {category.name}
+              {cat.name}
             </button>
           ))}
         </div>
 
+        {/* Loading */}
         {loading && (
           <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#586330] mb-4"></div>
-            <p className="text-gray-600 text-lg">Loading products...</p>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-[#586330] border-t-transparent"></div>
+            <p className="mt-4 text-lg text-gray-600">Loading products...</p>
           </div>
         )}
 
+        {/* Summary */}
         {!loading && (
-          <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
-            
-            <div className="flex gap-4 text-sm">
-              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-                Total Products: {products.length}
-              </span>
-            </div>
+          <div className="mb-6 flex justify-between items-center">
+            <span className="text-sm text-gray-600">
+              Showing page {currentPage} of {totalPages} ({totalCount} products)
+            </span>
           </div>
         )}
 
-        {!loading && productsToShow.length > 0 && (
+        {/* Products Grid */}
+        {!loading && products.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {productsToShow.map((product, index) => (
-              <ProductCard key={product.id || index} product={product} />
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
 
-        {!loading && productsToShow.length === 0 && (
+        {/* Empty State */}
+        {!loading && products.length === 0 && (
           <div className="text-center py-16 bg-white rounded-xl shadow-md">
-            <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl">📦</span>
+            <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center text-5xl">
+              📦
             </div>
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
-              {searchTerm || activeCategory !== 'all' ? 'No products found' : 'No products available'}
+            <h3 className="text-xl font-semibold text-gray-600">
+              {searchTerm || activeCategory !== 'all' ? 'No products found' : 'No products yet'}
             </h3>
-            <p className="text-gray-500 mb-6">
-              {searchTerm 
-                ? 'Try adjusting your search terms or filters' 
+            <p className="text-gray-500 mt-2">
+              {searchTerm
+                ? 'Try different keywords'
                 : activeCategory !== 'all'
-                ? `No products found in ${categories.find(c => c.id === activeCategory)?.name} category`
-                : 'Get started by adding your first product'
-              }
+                ? `No items in "${categories.find((c) => c.id === activeCategory)?.name}"`
+                : 'Start by adding your first product'}
             </p>
-            {products.length === 0 && (
+            {totalCount === 0 && (
               <button
                 onClick={handleAddProduct}
-                className="bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition font-medium"
+                className="mt-6 bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80"
               >
                 Add Your First Product
               </button>
             )}
           </div>
         )}
-        
-        {/* Pagination Controls */}
+
+        {/* Pagination */}
         {!loading && totalPages > 1 && (
-          <div className="flex justify-center items-center mt-8 space-x-2">
-            
-            {/* Previous Button */}
+          <div className="flex justify-center items-center mt-10 space-x-2">
             <button
               onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={`px-4 py-2 rounded-lg transition duration-200 font-medium ${
-                currentPage === 1
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-[#586330] text-white hover:bg-[#586330]/80'
-              }`}
+              disabled={!hasPreviousPage}
+              className={`px-4 py-2 rounded-lg ${hasPreviousPage ? 'bg-[#586330] text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
             >
               Previous
             </button>
 
-            {/* Page Numbers */}
-            {getPageNumbers().map(pageNumber => (
+            {getPageNumbers().map((p) => (
               <button
-                key={pageNumber}
-                onClick={() => handlePageChange(pageNumber)}
-                className={`px-4 py-2 rounded-lg transition duration-200 font-medium ${
-                  currentPage === pageNumber
-                    ? 'bg-[#586330] text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-                }`}
+                key={p}
+                onClick={() => handlePageChange(p)}
+                className={`px-4 py-2 rounded-lg ${currentPage === p ? 'bg-[#586330] text-white' : 'bg-white border border-gray-300'}`}
               >
-                {pageNumber}
+                {p}
               </button>
             ))}
 
-            {/* Next Button */}
             <button
               onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={`px-4 py-2 rounded-lg transition duration-200 font-medium ${
-                currentPage === totalPages
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-[#586330] text-white hover:bg-[#586330]/80'
-              }`}
+              disabled={!hasNextPage}
+              className={`px-4 py-2 rounded-lg ${hasNextPage ? 'bg-[#586330] text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
             >
               Next
             </button>
-             
           </div>
-          
         )}
 
-        {!loading && products.length > 0 && (
-          <div className="mt-8 bg-white rounded-xl shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Products Summary</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{products.length}</div>
-                <div className="text-sm text-blue-800">Total Products</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  {products.filter(p => p.quantity > 0).length}
-                </div>
-                <div className="text-sm text-green-800">In Stock</div>
-              </div>
-              <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600">
-                  {products.filter(p => p.quantity === 0).length}
-                </div>
-                <div className="text-sm text-yellow-800">Out of Stock</div>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">
-                  {products.reduce((sum, p) => sum + (p.images?.length || 0), 0)}
-                </div>
-                <div className="text-sm text-purple-800">Total Images</div>
-              </div>
-            </div>
-          </div>
+        {/* Modals */}
+        {showAddModal && (
+          <ProductModal
+            title="Add New Product"
+            newProduct={newProduct}
+            setNewProduct={setNewProduct}
+            onSave={handleSaveNewProduct}
+            onClose={() => {
+              setShowAddModal(false);
+              setNewProduct({ productName: '', description: '', price: 0, quantity: 1, productCategory: '', images: [], rating: 0 });
+            }}
+            handleImageUpload={handleImageUpload}
+            handleRemoveImage={handleRemoveImage}
+            categories={categories.filter((c) => c.id !== 'all')}
+            isSaving={saving}
+          />
         )}
+
+        {showUpdateModal && (
+          <ProductModal
+            title="Update Product"
+            newProduct={newProduct}
+            setNewProduct={setNewProduct}
+            onSave={handleSaveUpdatedProduct}
+            onClose={() => {
+              setShowUpdateModal(false);
+              setEditingProduct(null);
+              setNewProduct({ productName: '', description: '', price: 0, quantity: 1, productCategory: '', images: [], rating: 0 });
+            }}
+            handleImageUpload={handleImageUpload}
+            handleRemoveImage={handleRemoveImage}
+            categories={categories.filter((c) => c.id !== 'all')}
+            isSaving={saving}
+            editingProduct={editingProduct}
+          />
+        )}
+
+        <ToastContainer position="top-right" autoClose={3000} />
       </div>
-
-      {showAddModal && (
-        <ProductModal
-          title="Add New Product"
-          newProduct={newProduct}
-          setNewProduct={setNewProduct}
-          onSave={handleSaveNewProduct}
-          onClose={() => {
-            setShowAddModal(false);
-            setNewProduct({
-              productName: '',
-              description: '',
-              price: 0,
-              quantity: 1,
-              productCategory: '',
-              images: [],
-              rating: 0
-            });
-          }}
-          handleImageUpload={handleImageUpload}
-          handleRemoveImage={handleRemoveImage}
-          categories={categories.filter(cat => cat.id !== 'all')}
-          isSaving={saving}
-        />
-      )}
-
-     {showUpdateModal && (
-  <ProductModal
-    title="Update Product"
-    newProduct={newProduct}
-    setNewProduct={setNewProduct}
-    onSave={handleSaveUpdatedProduct}
-    onClose={() => {
-      setShowUpdateModal(false);
-      setEditingProduct(null);
-      setNewProduct({
-        productName: '',
-        description: '',
-        price: 0,
-        quantity: 1,
-        productCategory: '',
-        images: [],
-        rating: 0
-      });
-    }}
-    handleImageUpload={handleImageUpload}
-    handleRemoveImage={handleRemoveImage}
-    categories={categories.filter(cat => cat.id !== 'all')}
-    isSaving={saving}
-    editingProduct={editingProduct} // Add this line
-  />
-)}
-
-      <ToastContainer 
-        position="top-right" 
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-      />
     </div>
   );
 };

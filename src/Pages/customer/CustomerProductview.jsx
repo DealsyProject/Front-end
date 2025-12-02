@@ -69,6 +69,7 @@ export default function CustomerProductView() {
         productId: product.Id,
         quantity: 1,
       });
+      window.dispatchEvent(new Event("cartUpdated"));
       alert("✅ Product added to cart!");
     } catch (error) {
       console.error("❌ Add to cart failed:", error);
@@ -96,6 +97,7 @@ export default function CustomerProductView() {
         setWishlist(false);
         alert("💔 Removed from wishlist!");
       }
+      window.dispatchEvent(new Event("wishlistUpdated"));
     } catch (error) {
       console.error("❌ Wishlist update failed:", error);
       alert("Failed to update wishlist.");

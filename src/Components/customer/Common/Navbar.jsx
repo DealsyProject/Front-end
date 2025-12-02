@@ -11,6 +11,7 @@ export default function Navbar() {
 
   // ⭐ Cart count state
   const [cartCount, setCartCount] = useState(0);
+  const [wishlistCount, setWishlistCount] = useState(0);
 
   // ⭐ Fetch cart count using same API as CartPage
   const fetchCartCount = async () => {
@@ -22,19 +23,30 @@ export default function Navbar() {
       console.error("Error fetching cart count:", err);
     }
   };
+  const fetchWishlistCount = async () => {
+    try {
+      const res = await axiosInstance.get(`/Wishlist`); // backend detects user via token
+      setWishlistCount(res.data.length); // or use quantity logic if needed
+    } catch (err) {
+      console.error("Error fetching wishlist count:", err);
+    }
+  };
 
   // Check login status
   const checkLoginStatus = () => {
     const token = localStorage.getItem("authToken");
     setIsLoggedIn(!!token);
     if (token) fetchCartCount();
+    fetchWishlistCount(); // ⭐ added
+
   };
 
   useEffect(() => {
     checkLoginStatus();
 
-    // update navbar count when cart changes
+    // update navbar count when cart or wishlist changes
     window.addEventListener("cartUpdated", fetchCartCount);
+    window.addEventListener("wishlistUpdated", fetchWishlistCount);
 
     const handleStorageChange = () => checkLoginStatus();
     window.addEventListener("storage", handleStorageChange);
@@ -42,6 +54,8 @@ export default function Navbar() {
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("cartUpdated", fetchCartCount);
+      window.removeEventListener("wishlistUpdated", fetchWishlistCount);
+
     };
   }, []);
 
@@ -135,10 +149,19 @@ export default function Navbar() {
 
             {/* Icons */}
             <div className="bg-white/40 backdrop-blur-md rounded-full px-4 py-2 flex items-center space-x-3 relative">
-              <FaRegHeart
-                className="text-xl cursor-pointer hover:text-[#586330] transition"
-                onClick={() => navigate("/customerwishlist")}
-              />
+              <div className="relative">
+
+                <FaRegHeart
+                  className="text-xl cursor-pointer hover:text-[#586330] transition"
+                  onClick={() => navigate("/customerwishlist")}
+                />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-2 -right-3 bg-red-600 text-white text-xs px-1 py-[1px] rounded-full">
+                    {wishlistCount}
+                  </span>
+                )}
+              </div>
+
 
               {/* ⭐ Cart with badge */}
               <div className="relative">

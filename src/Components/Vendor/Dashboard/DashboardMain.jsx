@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import FinancialOverview from './FinancialOverview';
 import RecentActivities from './RecentActivities';
-import SidebarWidgets from './SidebarWidgets';
+
 
 const DashboardMain = ({
   activeView,
@@ -45,18 +45,12 @@ const DashboardMain = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className=" gap-6">
         <div className="lg:col-span-2 space-y-6">
           <FinancialOverview financialData={financialData} />
           <RecentActivities recentActivities={recentActivities} />
         </div>
-        <SidebarWidgets
-          setShowMessages={setShowMessages}
-          setShowNotifications={setShowNotifications}
-          messageThreads={messageThreads}
-          notifications={notifications}
-          outOfStockNotifications={outOfStockNotifications}
-        />
+        
       </div>
     </main>
   );

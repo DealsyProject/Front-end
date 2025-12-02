@@ -129,65 +129,98 @@ export const useNotificationHub = () => {
     });
 
     // In your useNotificationHub.js, update the ReceiveNotification handler
-connection.on('ReceiveNotification', (notification) => {
-  console.log('📨 [SignalR] RAW notification received:', notification);
-  console.log('📨 [SignalR] Notification type:', typeof notification);
-  console.log('📨 [SignalR] Notification keys:', Object.keys(notification));
-  console.log('📨 [SignalR] isOutOfStock value:', notification.isOutOfStock);
-  console.log('📨 [SignalR] type value:', notification.type);
-  
-  // Normalize the notification structure
-  const normalizedNotification = {
-    id: notification.id,
-    type: notification.type || '',
-    title: notification.title || '',
-    message: notification.message || '',
-    productId: notification.productId,
-    createdAt: notification.createdAt || notification.createdOn,
-    isRead: notification.isRead || false,
-    priority: notification.priority || '',
-    isOutOfStock: notification.isOutOfStock === true || 
-                  notification.type?.toLowerCase() === 'out_of_stock' || 
-                  notification.type?.toLowerCase() === 'out-of-stock',
-    source: 'signalr'
-  };
+    connection.on('ReceiveNotification', (notification) => {
+      console.log('📨 [SignalR] RAW notification received:', notification);
+      console.log('📨 [SignalR] Notification type:', typeof notification);
+      console.log('📨 [SignalR] Notification keys:', Object.keys(notification));
+      
+      // Normalize the notification structure (handle both PascalCase and camelCase)
+      const normalizedNotification = {
+        id: notification.Id || notification.id,
+        type: notification.Type || notification.type || '',
+        title: notification.Title || notification.title || '',
+        message: notification.Message || notification.message || '',
+        productId: notification.ProductId || notification.productId,
+        createdAt: notification.CreatedAt || notification.createdAt || notification.createdOn,
+        isRead: notification.IsRead || notification.isRead || false,
+        priority: notification.Priority || notification.priority || '',
+        isOutOfStock: notification.IsOutOfStock === true || 
+                      notification.isOutOfStock === true ||
+                      notification.Type?.toLowerCase() === 'out_of_stock' || 
+                      notification.type?.toLowerCase() === 'out_of_stock',
+        productName: notification.ProductName || notification.productName,
+        vendorId: notification.VendorId || notification.vendorId,
+        source: 'signalr'
+      };
 
-  console.log('📨 [SignalR] Normalized notification:', normalizedNotification);
-  
-  setNotifications(prev => {
-    const exists = prev.find(n => n.id === normalizedNotification.id);
-    if (exists) {
-      return prev.map(n => n.id === normalizedNotification.id ? normalizedNotification : n);
-    }
-    return [normalizedNotification, ...prev];
-  });
+      console.log('📨 [SignalR] Normalized notification:', normalizedNotification);
+      
+      setNotifications(prev => {
+        const exists = prev.find(n => n.id === normalizedNotification.id);
+        if (exists) {
+          return prev.map(n => n.id === normalizedNotification.id ? normalizedNotification : n);
+        }
+        return [normalizedNotification, ...prev];
+      });
 
-  if (!normalizedNotification.isRead) {
-    setUnreadCount(prev => prev + 1);
-  }
+      if (!normalizedNotification.isRead) {
+        setUnreadCount(prev => prev + 1);
+      }
 
-  // Show toast for out-of-stock notifications
-  if (normalizedNotification.isOutOfStock) {
-    toast.warning(`⚠️ ${normalizedNotification.title}`, {
-      position: 'top-right',
-      autoClose: 5000,
-    });
-  } else {
-    toast.info(normalizedNotification.title, {
-      position: 'top-right',
-      autoClose: 3000
-    });
-  }
-});
-
-    connection.on('AllNotificationsLoaded', (allNotifications) => {
-      console.log('📂 [SignalR] All notifications loaded:', allNotifications?.length || 0);
-      if (Array.isArray(allNotifications)) {
-        setNotifications(allNotifications);
-        const unread = allNotifications.filter(n => !n.isRead).length;
-        setUnreadCount(unread);
+      // Show toast for out-of-stock notifications
+      if (normalizedNotification.isOutOfStock) {
+        toast.warning(`⚠️ ${normalizedNotification.title}`, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+      } else {
+        toast.info(normalizedNotification.title, {
+          position: 'top-right',
+          autoClose: 3000
+        });
       }
     });
+
+  // In the AllNotificationsLoaded handler:
+connection.on('AllNotificationsLoaded', (allNotifications) => {
+  console.log('📂 [SignalR] All notifications loaded:', allNotifications?.length || 0);
+  
+  if (allNotifications) {
+    // Handle both array format and {notifications: [...]} format
+    let notificationsArray = [];
+    
+    if (Array.isArray(allNotifications)) {
+      notificationsArray = allNotifications;
+    } else if (allNotifications.notifications && Array.isArray(allNotifications.notifications)) {
+      notificationsArray = allNotifications.notifications;
+    } else if (allNotifications.Notifications && Array.isArray(allNotifications.Notifications)) {
+      notificationsArray = allNotifications.Notifications;
+    }
+    
+    // Normalize all notifications
+    const normalizedNotifications = notificationsArray.map(notification => ({
+      id: notification.Id || notification.id,
+      type: notification.Type || notification.type || '',
+      title: notification.Title || notification.title || '',
+      message: notification.Message || notification.message || '',
+      productId: notification.ProductId || notification.productId,
+      createdAt: notification.CreatedAt || notification.createdAt || notification.createdOn,
+      isRead: notification.IsRead || notification.isRead || false,
+      priority: notification.Priority || notification.priority || '',
+      isOutOfStock: notification.IsOutOfStock === true || 
+                    notification.isOutOfStock === true ||
+                    (notification.Type || notification.type || '').toLowerCase() === 'out_of_stock',
+      productName: notification.ProductName || notification.productName,
+      vendorId: notification.VendorId || notification.vendorId,
+      source: 'api'
+    }));
+    
+    console.log('📂 [SignalR] Normalized notifications:', normalizedNotifications);
+    setNotifications(normalizedNotifications);
+    const unread = normalizedNotifications.filter(n => !n.isRead).length;
+    setUnreadCount(unread);
+  }
+});
 
     connection.on('NotificationMarkedAsRead', (notificationId) => {
       console.log('✓ [SignalR] Notification marked as read:', notificationId);

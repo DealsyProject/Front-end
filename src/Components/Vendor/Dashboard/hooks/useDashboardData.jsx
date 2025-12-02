@@ -20,38 +20,41 @@ export const useDashboardData = (navigate) => {
     try {
       console.log('🔔 [Dashboard] Fetching notifications from API...');
       
-      const response = await axiosInstance.get('/Notification/vendor-out-of-stock');
-      
-      console.log('🔔 [Dashboard] API response:', response.data);
-      
-      if (response.data && response.data.notifications) {
-        const apiNotifications = response.data.notifications;
-        console.log('🔔 [Dashboard] Raw API notifications:', apiNotifications);
-        
-        // Normalize the notifications to match expected structure
-        const normalizedNotifications = apiNotifications.map(notification => ({
-          id: notification.id,
-          type: notification.type || '',
-          title: notification.title || '',
-          message: notification.message || '',
-          productId: notification.productId,
-          createdAt: notification.createdAt,
-          isRead: notification.isRead || false,
-          priority: notification.priority || '',
-          isOutOfStock: notification.isOutOfStock === true,
-          source: 'api'
-        }));
-        
-        console.log('🔔 [Dashboard] Normalized notifications:', normalizedNotifications);
-        setNotifications(normalizedNotifications);
-      } else {
-        console.warn('🔔 [Dashboard] No notifications in response');
-        setNotifications([]);
-      }
+      const notificationResponse = await axiosInstance.get('/Notification/vendor-out-of-stock');
+    
+    // Handle both response formats
+    let notificationsArray = [];
+    
+    if (Array.isArray(notificationResponse.data)) {
+      notificationsArray = notificationResponse.data;
+    } else if (notificationResponse.data.notifications && Array.isArray(notificationResponse.data.notifications)) {
+      notificationsArray = notificationResponse.data.notifications;
+    } else if (notificationResponse.data.Notifications && Array.isArray(notificationResponse.data.Notifications)) {
+      notificationsArray = notificationResponse.data.Notifications;
+    }
+    
+    // Normalize notifications
+    const normalizedNotifications = notificationsArray.map(notification => ({
+      id: notification.Id || notification.id,
+      type: notification.Type || notification.type || '',
+      title: notification.Title || notification.title || '',
+      message: notification.Message || notification.message || '',
+      productId: notification.ProductId || notification.productId,
+      createdAt: notification.CreatedAt || notification.createdAt || notification.createdOn,
+      isRead: notification.IsRead || notification.isRead || false,
+      priority: notification.Priority || notification.priority || '',
+      isOutOfStock: notification.IsOutOfStock === true || 
+                    notification.isOutOfStock === true ||
+                    (notification.Type || notification.type || '').toLowerCase() === 'out_of_stock',
+      productName: notification.ProductName || notification.productName,
+      vendorId: notification.VendorId || notification.vendorId,
+      source: 'api'
+    }));
+    
+    setNotifications(normalizedNotifications);
+
     } catch (error) {
-      console.error('❌ [Dashboard] Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
-      setNotifications([]);
+      console.error('❌ Error fetching dashboard data:', error);
     }
   }, []);
 

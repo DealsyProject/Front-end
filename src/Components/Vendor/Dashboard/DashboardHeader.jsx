@@ -39,17 +39,7 @@ const DashboardHeader = ({
       </h2>
 
       <div className="flex items-center space-x-4">
-        {/* Message Button */}
-        <button
-          onClick={() => setShowMessages(true)}
-          className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors relative"
-          title="Messages"
-        >
-          Messages
-          {/* {messageThreads?.filter(m => m.unread)?.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#586330] rounded-full"></span>
-          )} */}
-        </button>
+        
 
         {/* Notification Button */}
         <button

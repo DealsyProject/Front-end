@@ -6,51 +6,79 @@ export default function CustomerOrders() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [showReturnBox, setShowReturnBox] = useState(null);
+  const [returnReason, setReturnReason] = useState("");
 
   useEffect(() => {
     fetchCustomerOrders();
   }, []);
 
+  const handleReturn = async (orderId) => {
+    if (!returnReason) {
+      alert("Please select a return reason");
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to request a return?")) return;
+
+    try {
+      // later you will replace with your API endpoint
+      await axiosInstance.post("/Order/return", {
+        orderId,
+        reason: returnReason,
+      });
+
+      alert("Return request submitted successfully!");
+
+      // reset UI
+      setShowReturnBox(null);
+      setReturnReason("");
+      fetchCustomerOrders(); // refresh orders to update status
+    } catch (e) {
+      alert("Failed to request return. Please try again.");
+    }
+  };
+
   const fetchCustomerOrders = async () => {
-  try {
-    const response = await axiosInstance.get('/Order/customer/orders');
-    let ordersData = response.data.orders || [];
+    try {
+      const response = await axiosInstance.get('/Order/customer/orders');
+      let ordersData = response.data.orders || [];
 
-    // Loop orders → loop items → fetch product image
-    const updatedOrders = await Promise.all(
-      ordersData.map(async (order) => {
-        const updatedItems = await Promise.all(
-          order.Items.map(async (item) => {
-            try {
-              // Fetch product details to get image
-              const prodRes = await axiosInstance.get(`/Product/${item.ProductId}`);
-              const prod = prodRes.data;
+      // Loop orders → loop items → fetch product image
+      const updatedOrders = await Promise.all(
+        ordersData.map(async (order) => {
+          const updatedItems = await Promise.all(
+            order.Items.map(async (item) => {
+              try {
+                // Fetch product details to get image
+                const prodRes = await axiosInstance.get(`/Product/${item.ProductId}`);
+                const prod = prodRes.data;
 
-              const primaryImage =
-                prod.Images?.find((img) => img.IsPrimary) || prod.Images?.[0];
+                const primaryImage =
+                  prod.Images?.find((img) => img.IsPrimary) || prod.Images?.[0];
 
-              return {
-                ...item,
-                Image: primaryImage?.ImageUrl || item.Image || null
-              };
-            } catch {
-              return { ...item, Image: item.Image || null };
-            }
-          })
-        );
+                return {
+                  ...item,
+                  Image: primaryImage?.ImageUrl || item.Image || null
+                };
+              } catch {
+                return { ...item, Image: item.Image || null };
+              }
+            })
+          );
 
-        return { ...order, Items: updatedItems };
-      })
-    );
+          return { ...order, Items: updatedItems };
+        })
+      );
 
-    setOrders(updatedOrders);
-  } catch (error) {
-    console.error("❌ Error fetching orders:", error);
-    alert("Failed to load orders.");
-  } finally {
-    setLoading(false);
-  }
-};
+      setOrders(updatedOrders);
+    } catch (error) {
+      console.error("❌ Error fetching orders:", error);
+      alert("Failed to load orders.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   const viewOrderDetails = (order) => {
@@ -117,6 +145,41 @@ export default function CustomerOrders() {
                 >
                   View Details →
                 </button>
+                {order.Status?.toLowerCase() === "delivered" && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setShowReturnBox(showReturnBox === order.Id ? null : order.Id)}
+                      className="px-4 py-2 text-sm font-medium bg-red-500 text-white rounded hover:bg-red-600 transition"
+                    >
+                      {showReturnBox === order.Id ? "Cancel Return" : "Return Order"}
+                    </button>
+
+                    {showReturnBox === order.Id && (
+                      <div className="mt-3 bg-gray-100 p-4 rounded-lg">
+                        <label className="block text-sm font-medium mb-2">Select Return Reason</label>
+                        <select
+                          value={returnReason}
+                          onChange={(e) => setReturnReason(e.target.value)}
+                          className="w-full border p-2 rounded"
+                        >
+                          <option value="">-- Choose a reason --</option>
+                          <option value="Item arrived damaged">Item arrived damaged</option>
+                          <option value="Not expected item">Not expected item</option>
+                          <option value="Changed my mind">Changed my mind</option>
+                        </select>
+
+                        <button
+                          onClick={() => handleReturn(order.Id)}
+                          disabled={!returnReason}
+                          className="mt-3 w-full bg-red-600 text-white py-2 rounded hover:bg-red-700 disabled:opacity-50"
+                        >
+                          Confirm Return
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
             </div>
           ))}

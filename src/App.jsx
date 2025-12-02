@@ -58,6 +58,7 @@ import SupportChatCustomer from './Pages/SupportTeam/SupportChatCustomer.jsx';
 import SupportChatToAdmin from './Pages/SupportTeam/SupportChatToAdmin.jsx';
 import AdminChatToSupport from './Pages/Admin/AdminChatToSupport.jsx';
 import CustomerChat from './Pages/customer/CustomerChat';
+import SupportProfile from './Pages/SupportTeam/SupportProfile.jsx';
 
 
 
@@ -123,6 +124,7 @@ function App() {
         <Route path="/support-emailsupport" element={<EmailSupport />}/>
         <Route path="/support-supportchattoadmin" element={<SupportChatToAdmin />}/>
         <Route path="/support-adminchattosupport" element={<AdminChatToSupport />}/>
+        <Route path="/support-profile" element={<SupportProfile />}/>
         
 
          </Routes>

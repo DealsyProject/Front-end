@@ -340,6 +340,53 @@ function CustomerChat() {
             </div>
           </div>
         </div>
+        <div className={`mt-16 bg-rounded-3xl shadow-2xl p-12 text-center text-white transform hover:shadow-2xl transition-all duration-300`}>
+          <div className="max-w-2xl mx-auto">
+            <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm">
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-3xl font-bold mb-4">
+              Still need help? We've got you covered!
+            </h3>
+            <p className="text-white/80 text-lg mb-8 leading-relaxed">
+              Our dedicated support team is available 24/7 to assist you with any questions or concerns. Choose your preferred way to connect with us.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button 
+                onClick={() => navigate('/support-faq-options')}
+                className={`bg-white text- px-8 py-4 rounded-xl hover:bg-lime-50 transition-all duration-300 font-semibold flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Faq Options
+              </button>
+              <button 
+                onClick={() => navigate('/support-emailsupport')}
+                className="bg-white/10 backdrop-blur-sm text-white border-2 border-white/30 px-8 py-4 rounded-xl hover:bg-white/20 transition-all duration-300 font-semibold flex items-center justify-center gap-3 hover:border-white/50"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Email Support
+              </button>
+              <button 
+                onClick={() => window.open('tel:+1-800-332-5791')}
+                className="bg-white/10 backdrop-blur-sm text-white border-2 border-white/30 px-8 py-4 rounded-xl hover:bg-white/20 transition-all duration-300 font-semibold flex items-center justify-center gap-3 hover:border-white/50"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                Call Support
+              </button>
+            </div>
+            <div className="mt-6 text-white/70 text-sm">
+              💡 <strong>Pro Tip:</strong> Live Chat gets you instant answers, while email is perfect for detailed issues.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

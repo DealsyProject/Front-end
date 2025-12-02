@@ -335,7 +335,7 @@ const quotes = [
         <NavbarSupport />
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-[#586330] rounded-xl">
+            <div className="p-2 bg-[#8ba03e] rounded-xl">
               <Users className="h-6 w-6 text-white" />
             </div>
             <div>

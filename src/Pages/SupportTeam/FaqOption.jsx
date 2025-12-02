@@ -1,5 +1,10 @@
+// FaqOption.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+// Define the primary color utility for better readability
+const PRIMARY_COLOR_HEX = '#586330'; // Olive/Moss Green
+const LIGHT_COLOR = '#f7fee7'; // Light Lime (equivalent to lime-50)
 
 function FaqOption() {
   const [activeIndex, setActiveIndex] = useState(null);
@@ -86,7 +91,7 @@ function FaqOption() {
 
   const filteredFaqs = faqData.filter(faq => {
     const matchesSearch = faq.question.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         faq.answer.toLowerCase().includes(searchTerm.toLowerCase());
+                          faq.answer.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || faq.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -104,16 +109,16 @@ function FaqOption() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8 px-4 sm:px-6 lg:px-8">
+    <div className={`min-h-screen bg-[${LIGHT_COLOR}] py-8 px-4 sm:px-6 lg:px-8`}>
       <div className="max-w-6xl mx-auto">
         {/* Enhanced Header */}
         <div className="text-center mb-16">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-2xl mb-6 transform hover:rotate-3 transition-transform duration-300">
+          <div className={`inline-flex items-center justify-center w-20 h-20 bg-[${PRIMARY_COLOR_HEX}] rounded-2xl shadow-2xl mb-6 transform hover:rotate-3 transition-transform duration-300`}>
             <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-gray-900 to-blue-600 bg-clip-text text-transparent mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-4">
             How can we help you?
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
@@ -131,7 +136,7 @@ function FaqOption() {
                 placeholder="Search questions or answers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-6 py-5 pl-16 pr-6 text-lg text-gray-700 bg-gray-50/80 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300"
+                className={`w-full px-6 py-5 pl-16 pr-6 text-lg text-gray-700 bg-gray-50/80 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-[${PRIMARY_COLOR_HEX}] focus:ring-4 focus:ring-[#58633033] transition-all duration-300`}
               />
               <div className="absolute inset-y-0 left-0 flex items-center pl-6">
                 <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,7 +155,7 @@ function FaqOption() {
               )}
             </div>
 
-            {/* Category Filters */}
+            {/* Category Filters - Olive Green Active State */}
             <div className="flex flex-wrap gap-3 justify-center">
               {Object.entries(categories).map(([key, label]) => (
                 <button
@@ -158,8 +163,8 @@ function FaqOption() {
                   onClick={() => setSelectedCategory(key)}
                   className={`px-5 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ${
                     selectedCategory === key
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                      ? `bg-[${PRIMARY_COLOR_HEX}] text-white shadow-lg` // Active: Olive Green
+                      : `bg-white text-gray-700 border-2 border-gray-200 hover:border-[#58633080] hover:bg-[${LIGHT_COLOR}]` // Inactive: Hover with subtle Olive
                   }`}
                 >
                   {key !== 'all' && <span className="mr-2">{getCategoryIcon(key)}</span>}
@@ -174,7 +179,7 @@ function FaqOption() {
         {searchTerm && (
           <div className="mb-6 text-center">
             <p className="text-gray-600">
-              Found <span className="font-semibold text-blue-600">{filteredFaqs.length}</span> results for "<span className="font-semibold">{searchTerm}</span>"
+              Found <span className={`font-semibold text-[${PRIMARY_COLOR_HEX}]`}>{filteredFaqs.length}</span> results for "<span className="font-semibold">{searchTerm}</span>"
             </p>
           </div>
         )}
@@ -183,7 +188,7 @@ function FaqOption() {
         <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden transform hover:shadow-2xl transition-all duration-300">
           {filteredFaqs.length === 0 ? (
             <div className="text-center py-16">
-              <div className="w-24 h-24 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -194,7 +199,7 @@ function FaqOption() {
               </p>
               <button
                 onClick={() => setSearchTerm('')}
-                className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors duration-200 font-medium"
+                className={`bg-[${PRIMARY_COLOR_HEX}] text-white px-6 py-3 rounded-xl hover:opacity-90 transition-colors duration-200 font-medium`}
               >
                 Clear Search
               </button>
@@ -205,21 +210,22 @@ function FaqOption() {
                 key={index}
                 className={`group border-b border-gray-200/80 last:border-b-0 transition-all duration-300 ${
                   activeIndex === index 
-                    ? 'bg-gradient-to-r from-blue-50 to-indigo-50' 
+                    ? `bg-[${LIGHT_COLOR}] border-l-4 border-l-[${PRIMARY_COLOR_HEX}]` // Active: Light Lime BG, Olive Border
                     : 'bg-white hover:bg-gray-50/80'
                 }`}
               >
                 {/* Question */}
                 <button
-                  className="w-full px-8 py-6 text-left transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-100 rounded-lg"
+                  className="w-full px-8 py-6 text-left transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-[#58633033] rounded-lg"
                   onClick={() => toggleFAQ(index)}
                 >
                   <div className="flex justify-between items-start gap-6">
                     <div className="flex items-start gap-4 flex-1">
+                      {/* Icon Container */}
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
                         activeIndex === index 
-                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white scale-110' 
-                          : 'bg-gray-100 text-gray-600 group-hover:bg-blue-100 group-hover:text-blue-600'
+                          ? `bg-[${PRIMARY_COLOR_HEX}] text-white scale-110` // Active: Olive Green
+                          : `bg-gray-100 text-gray-600 group-hover:bg-lime-100 group-hover:text-[${PRIMARY_COLOR_HEX}]` // Inactive: Hover Lime
                       }`}>
                         <span className="text-sm font-medium">
                           {getCategoryIcon(faq.category)}
@@ -230,9 +236,10 @@ function FaqOption() {
                           {faq.question}
                         </h3>
                         <div className="flex items-center gap-3">
+                          {/* Category Badge */}
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                             activeIndex === index
-                              ? 'bg-white/80 text-blue-700'
+                              ? `bg-white/80 text-[${PRIMARY_COLOR_HEX}]` // Active: White badge, Olive text
                               : 'bg-gray-100 text-gray-600'
                           }`}>
                             {categories[faq.category]}
@@ -240,10 +247,11 @@ function FaqOption() {
                         </div>
                       </div>
                     </div>
+                    {/* Chevron Icon */}
                     <span className={`flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-2xl transition-all duration-500 ${
                       activeIndex === index 
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rotate-180 scale-110' 
-                        : 'bg-gray-100 text-gray-600 group-hover:bg-blue-100 group-hover:text-blue-600 group-hover:scale-110'
+                        ? `bg-[${PRIMARY_COLOR_HEX}] text-white rotate-180 scale-110` // Active: Olive Green
+                        : `bg-gray-100 text-gray-600 group-hover:bg-lime-100 group-hover:text-[${PRIMARY_COLOR_HEX}] group-hover:scale-110`
                     }`}>
                       <svg 
                         className="w-6 h-6 transition-transform duration-500" 
@@ -271,12 +279,12 @@ function FaqOption() {
                   }`}
                 >
                   <div className="px-8 pb-8">
-                    <div className="pl-14 border-l-4 border-blue-200">
+                    <div className={`pl-14 border-l-4 border-[#58633080]`}> {/* Olive accent line */}
                       <p className="text-gray-700 leading-relaxed text-lg">
                         {faq.answer}
                       </p>
                       {activeIndex === index && (
-                        <div className="mt-4 flex items-center gap-2 text-sm text-blue-600 font-medium">
+                        <div className={`mt-4 flex items-center gap-2 text-sm text-[${PRIMARY_COLOR_HEX}] font-medium`}>
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
@@ -291,8 +299,8 @@ function FaqOption() {
           )}
         </div>
 
-        {/* Enhanced Contact Support Section */}
-        <div className="mt-16 bg-gradient-to-r from-blue-600 to-purple-700 rounded-3xl shadow-2xl p-12 text-center text-white transform hover:shadow-2xl transition-all duration-300">
+        {/* Enhanced Contact Support Section - Olive Green Background */}
+        <div className={`mt-16 bg-[${PRIMARY_COLOR_HEX}] rounded-3xl shadow-2xl p-12 text-center text-white transform hover:shadow-2xl transition-all duration-300`}>
           <div className="max-w-2xl mx-auto">
             <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm">
               <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -302,13 +310,13 @@ function FaqOption() {
             <h3 className="text-3xl font-bold mb-4">
               Still need help? We've got you covered!
             </h3>
-            <p className="text-blue-100 text-lg mb-8 leading-relaxed">
+            <p className="text-white/80 text-lg mb-8 leading-relaxed">
               Our dedicated support team is available 24/7 to assist you with any questions or concerns. Choose your preferred way to connect with us.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button 
                 onClick={() => navigate('/customerchat')}
-                className="bg-white text-blue-600 px-8 py-4 rounded-xl hover:bg-blue-50 transition-all duration-300 font-semibold flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className={`bg-white text-[${PRIMARY_COLOR_HEX}] px-8 py-4 rounded-xl hover:bg-lime-50 transition-all duration-300 font-semibold flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -334,7 +342,7 @@ function FaqOption() {
                 Call Support
               </button>
             </div>
-            <div className="mt-6 text-blue-100 text-sm">
+            <div className="mt-6 text-white/70 text-sm">
               💡 <strong>Pro Tip:</strong> Live Chat gets you instant answers, while email is perfect for detailed issues.
             </div>
           </div>

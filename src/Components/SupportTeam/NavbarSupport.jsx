@@ -50,6 +50,13 @@ function NavbarSupport() {
           Admin-ChatCenter
         </Link>
 
+        <Link
+          to="/support-profile"
+          className="hover:text-green-800 transition"
+        >
+         Profile
+        </Link>
+
       </div>
     </nav>
   );

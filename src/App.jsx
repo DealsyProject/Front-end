@@ -48,12 +48,12 @@ import Payments from './Pages/Vendor/Dashboard/Payments';
 import CustemerVenderDetails from "./Pages/SupportTeam/CustemerVenderDetails"
 import ReturnRefundTracker from './Pages/SupportTeam/ReturnRefundTracker';
 import FaqOption from './Pages/SupportTeam/FaqOption.jsx';
-import EmailSupport from './Pages/SupportTeam/EmailSupport.jsx';
 import SupportChatCustomer from './Pages/SupportTeam/SupportChatCustomer.jsx';
 import SupportChatToAdmin from './Pages/SupportTeam/SupportChatToAdmin.jsx';
 import AdminChatToSupport from './Pages/Admin/AdminChatToSupport.jsx';
 import CustomerChat from './Pages/customer/CustomerChat';
 import SupportProfile from './Pages/SupportTeam/SupportProfile.jsx';
+import EmailSupport from './Pages/SupportTeam/EmailSupport.jsx';
 
 
 

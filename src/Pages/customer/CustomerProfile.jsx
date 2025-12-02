@@ -85,13 +85,12 @@ export default function ProfilePage() {
     profile?.[field] || profile?.[field.toLowerCase()] || "N/A";
 
   return (
-    <div className="flex flex-col min-h-screen bg-pink-50">
+    <div className="min-h-screen bg-pink-50 flex flex-col">
       <Navbar />
-      <main className="flex-grow flex justify-center px-6 py-10">
-        <div className="bg-white rounded-xl shadow-md w-full max-w-6xl p-6 flex flex-col md:flex-row gap-8">
-
+      <main className="flex-1 flex justify-center px-6 py-4">
+        <div className="bg-white rounded-xl shadow-md w-full max-w-6xl p-6 flex flex-col md:flex-row gap-8 flex-1">
           {/* LEFT - PROFILE SIDEBAR */}
-          <div className="w-full md:w-1/4 border rounded-xl p-4">
+          <div className="w-full md:w-1/4 border rounded-xl p-4 flex-shrink-0">
             <div className="flex flex-col items-center relative">
 
               {loading ? (
@@ -160,7 +159,7 @@ export default function ProfilePage() {
           </div>
 
           {/* RIGHT SIDE – PROFILE DETAILS */}
-          <div className="flex-1 border rounded-xl p-6">
+          <div className="flex-1 border rounded-xl p-6 overflow-y-auto max-h-[70vh]">
             {active === "My Profile" && (
               <div>
                 <h3 className="text-lg font-semibold mb-6 border-b pb-2">Profile Information</h3>

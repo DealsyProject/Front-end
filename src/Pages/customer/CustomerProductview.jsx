@@ -47,20 +47,21 @@ export default function CustomerProductView() {
         setLoading(false);
       }
     };
-    
+
     fetchProduct();
   }, [id]);
 
   const checkWishlistStatus = async (productId) => {
     try {
-      const response = await axiosInstance.get(`/Wishlist`);
+      const response = await axiosInstance.get(`/wishlist`);
       const wishlistItems = response.data || [];
-      const isInWishlist = wishlistItems.some(item => item.productId === productId);
+      const isInWishlist = wishlistItems.some(item => item.ProductId === productId);
       setWishlist(isInWishlist);
     } catch (error) {
       console.error("❌ Error checking wishlist status:", error);
     }
   };
+
 
   const handleAddToCart = async () => {
     try {
@@ -78,16 +79,22 @@ export default function CustomerProductView() {
   const handleWishlist = async () => {
     try {
       if (!wishlist) {
-        await axiosInstance.post(`/Wishlist`, {
-          productId: product.Id,
-        });
+        // ADD TO WISHLIST
+        await axiosInstance.post(`/wishlist`, { ProductId: product.Id });
         setWishlist(true);
-        alert("✅ Added to wishlist!");
+        alert("❤️ Added to wishlist!");
       } else {
-        // Remove from wishlist logic
-        await axiosInstance.delete(`/Wishlist/${product.Id}`);
+        // REMOVE FROM WISHLIST
+        const response = await axiosInstance.get(`/wishlist`);
+        const wishlistItems = response.data || [];
+        const item = wishlistItems.find(i => i.ProductId === product.Id);
+
+        if (item) {
+          await axiosInstance.delete(`/wishlist/${item.Id}`);
+        }
+
         setWishlist(false);
-        alert("✅ Removed from wishlist!");
+        alert("💔 Removed from wishlist!");
       }
     } catch (error) {
       console.error("❌ Wishlist update failed:", error);
@@ -133,7 +140,7 @@ export default function CustomerProductView() {
             <div className="relative flex flex-col items-center">
               <img
                 src={mainImage || "https://via.placeholder.com/400x300?text=No+Image"}
-                alt={product.ProductName} 
+                alt={product.ProductName}
                 className="w-full h-80 object-cover rounded-lg shadow-sm"
                 onError={(e) => {
                   e.target.src = 'https://via.placeholder.com/400x300?text=No+Image';
@@ -143,12 +150,12 @@ export default function CustomerProductView() {
                 onClick={handleWishlist}
                 className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition"
               >
-                {wishlist ? 
-                  <FaHeart className="text-red-500 text-xl" /> : 
+                {wishlist ?
+                  <FaHeart className="text-red-500 text-xl" /> :
                   <FaRegHeart className="text-gray-600 text-xl hover:text-red-500" />
                 }
               </button>
-              
+
               {productImages.length > 1 && (
                 <div className="flex gap-4 mt-5 overflow-x-auto py-2">
                   {productImages.map((img, i) => (
@@ -157,9 +164,8 @@ export default function CustomerProductView() {
                       src={img.ImageUrl}
                       alt={`${product.ProductName} view ${i + 1}`}
                       onClick={() => setMainImage(img.ImageUrl)}
-                      className={`w-20 h-20 object-cover rounded-md cursor-pointer border-2 transition ${
-                        img.ImageUrl === mainImage ? "border-[#3b450d]" : "border-transparent hover:border-gray-300"
-                      }`}
+                      className={`w-20 h-20 object-cover rounded-md cursor-pointer border-2 transition ${img.ImageUrl === mainImage ? "border-[#3b450d]" : "border-transparent hover:border-gray-300"
+                        }`}
                       onError={(e) => {
                         e.target.src = 'https://via.placeholder.com/80x80?text=No+Image';
                       }}
@@ -180,12 +186,16 @@ export default function CustomerProductView() {
               <p className="text-2xl font-semibold text-[#3b450d] mb-4">
                 ₹{product.Price?.toLocaleString('en-IN') || '0'}
               </p>
-              
-              <p className={`mb-4 text-sm font-medium ${
-                product.Quantity > 0 ? "text-green-600" : "text-red-500"
-              }`}>
-                {product.Quantity > 0 ? `In Stock: ${product.Quantity} units` : "Out of Stock"}
+
+              <p
+                className={`mb-4 text-sm font-medium ${product.Quantity > 0 ? "text-green-600" : "text-red-600"
+                  }`}
+              >
+                {product.Quantity > 0
+                  ? `In Stock`
+                  : "Unavailable"}
               </p>
+
 
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-700 mb-2">Description:</h3>
@@ -195,11 +205,10 @@ export default function CustomerProductView() {
               <div className="flex gap-3">
                 <button
                   onClick={handleWishlist}
-                  className={`flex-1 px-6 py-3 rounded-md transition font-medium ${
-                    wishlist 
-                      ? "bg-red-500 text-white hover:bg-red-600" 
-                      : "border border-[#3b450d] text-[#3b450d] hover:bg-[#3b450d] hover:text-white"
-                  }`}
+                  className={`flex-1 px-6 py-3 rounded-md transition font-medium ${wishlist
+                    ? "bg-red-500 text-white hover:bg-red-600"
+                    : "border border-[#3b450d] text-[#3b450d] hover:bg-[#3b450d] hover:text-white"
+                    }`}
                 >
                   {wishlist ? "Added to Wishlist ❤️" : "Add to Wishlist"}
                 </button>
@@ -207,11 +216,10 @@ export default function CustomerProductView() {
                 <button
                   disabled={product.Quantity === 0}
                   onClick={handleAddToCart}
-                  className={`flex-1 px-6 py-3 rounded-md transition font-medium ${
-                    product.Quantity === 0
-                      ? "bg-gray-400 text-gray-100 cursor-not-allowed"
-                      : "bg-[#3b450d] text-white hover:bg-[#2e350b]"
-                  }`}
+                  className={`flex-1 px-6 py-3 rounded-md transition font-medium ${product.Quantity === 0
+                    ? "bg-gray-400 text-gray-100 cursor-not-allowed"
+                    : "bg-[#3b450d] text-white hover:bg-[#2e350b]"
+                    }`}
                 >
                   {product.Quantity === 0 ? "Out of Stock" : "Add to Cart 🛒"}
                 </button>
@@ -220,12 +228,6 @@ export default function CustomerProductView() {
               {/* Additional Product Info */}
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                  <div>
-                    <span className="font-semibold">Product ID:</span> {product.Id}
-                  </div>
-                  <div>
-                    <span className="font-semibold">Vendor ID:</span> {product.VendorId}
-                  </div>
                   {product.Rating > 0 && (
                     <div>
                       <span className="font-semibold">Rating:</span> ⭐ {product.Rating.toFixed(1)}

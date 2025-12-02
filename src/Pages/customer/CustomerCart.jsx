@@ -78,6 +78,7 @@ export default function CustomerCart() {
     try {
       await axiosInstance.delete(`/Cart/${cartItemId}`);
       setCart((prev) => prev.filter((i) => i.Id !== cartItemId));
+      window.dispatchEvent(new Event("cartUpdated")); // 🔥 navbar refresh
     } catch (error) {
       console.error("❌ Error removing item:", error);
       alert("Failed to remove item from cart");
@@ -90,6 +91,7 @@ export default function CustomerCart() {
     try {
       await axiosInstance.delete(`/Cart/clear`);
       setCart([]);
+      window.dispatchEvent(new Event("cartUpdated")); // 🔥 navbar refresh
       alert("🗑️ Cart cleared!");
     } catch (error) {
       console.error("❌ Error clearing cart:", error);
@@ -228,9 +230,9 @@ export default function CustomerCart() {
                     <span>Subtotal ({cart.length} items)</span>
                     <span className="font-medium">₹{total.toFixed(2)}</span>
                   </div>
-                  
+
                   {/* REMOVED SHIPPING FEE SECTION */}
-                  
+
                   <div className="border-t pt-4 flex justify-between text-lg font-semibold text-gray-800">
                     <span>Total</span>
                     <span>₹{total.toFixed(2)}</span>
@@ -239,11 +241,10 @@ export default function CustomerCart() {
 
                 <Link
                   to="/checkout"
-                  className={`block w-full py-3 rounded-lg text-center font-medium transition ${
-                    cart.length === 0
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-[#586330] text-white hover:bg-[#586330]/80"
-                  }`}
+                  className={`block w-full py-3 rounded-lg text-center font-medium transition ${cart.length === 0
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-[#586330] text-white hover:bg-[#586330]/80"
+                    }`}
                 >
                   {cart.length === 0 ? "Cart is Empty" : "Proceed to Checkout"}
                 </Link>

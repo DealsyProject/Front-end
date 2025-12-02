@@ -58,6 +58,7 @@ export default function WishlistPage() {
     try {
       await axiosInstance.delete(`/wishlist/${id}`);
       setWishlist((prev) => prev.filter((item) => item.Id !== id));
+      window.dispatchEvent(new Event("wishlistUpdated"));
     } catch (error) {
       console.error("❌ Error removing from wishlist:", error);
     }

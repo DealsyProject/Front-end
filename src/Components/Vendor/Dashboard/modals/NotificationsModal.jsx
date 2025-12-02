@@ -14,9 +14,9 @@ const NotificationsModal = ({
   const [activeTab, setActiveTab] = useState('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  console.log('🔔 [Modal] Received notifications:', notifications);
-  console.log('📦 [Modal] Real out-of-stock notifications:', outOfStockNotifications);
-  console.log('📝 [Modal] Other notifications:', otherNotifications);
+  console.log('🔔 [Modal] RAW notifications received:', notifications);
+  console.log('🔔 [Modal] First notification RAW:', notifications[0]);
+  console.log('🔔 [Modal] First notification keys:', notifications[0] ? Object.keys(notifications[0]) : 'No notifications');
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -25,22 +25,67 @@ const NotificationsModal = ({
   };
 
   const handleMarkAsRead = async (notificationId, e) => {
-    e.stopPropagation();
-    await markNotificationAsRead(notificationId);
+    if (e) e.stopPropagation();
+    
+    if (!notificationId) {
+      console.error('❌ [Modal] No notification ID provided');
+      console.error('❌ [Modal] Notification object:', notifications.find(n => n.id === notificationId || n.Id === notificationId));
+      return;
+    }
+    
+    try {
+      await markNotificationAsRead(notificationId);
+    } catch (error) {
+      console.error('❌ [Modal] Error marking notification as read:', error);
+    }
+  };
+
+  // Helper function to get notification ID safely
+  const getNotificationId = (notification) => {
+    return notification.id || notification.Id || `temp-${Math.random()}`;
+  };
+
+  // Helper function to normalize notification for display
+  const normalizeForDisplay = (notification) => {
+    return {
+      id: getNotificationId(notification),
+      type: notification.Type || notification.type || '',
+      title: notification.Title || notification.title || '',
+      message: notification.Message || notification.message || '',
+      productId: notification.ProductId || notification.productId,
+      createdAt: notification.CreatedAt || notification.createdAt || notification.createdOn,
+      isRead: notification.IsRead || notification.isRead || false,
+      priority: notification.Priority || notification.priority || '',
+      isOutOfStock: notification.IsOutOfStock === true || 
+                    notification.isOutOfStock === true ||
+                    (notification.Type || notification.type || '').toLowerCase() === 'out_of_stock',
+      productName: notification.ProductName || notification.productName,
+      vendorId: notification.VendorId || notification.vendorId,
+      // Keep raw data for debugging
+      _raw: notification
+    };
   };
 
   const getDisplayNotifications = () => {
+    // Ensure we have arrays to work with
+    const safeNotifications = Array.isArray(notifications) ? notifications : [];
+    const safeOutOfStock = Array.isArray(outOfStockNotifications) ? outOfStockNotifications : [];
+    const safeOther = Array.isArray(otherNotifications) ? otherNotifications : [];
+
     switch (activeTab) {
       case 'outOfStock':
-        return outOfStockNotifications;
+        return safeOutOfStock;
       case 'other':
-        return otherNotifications;
+        return safeOther;
       default:
-        return notifications;
+        return safeNotifications;
     }
   };
 
   const displayNotifications = getDisplayNotifications();
+  const normalizedDisplayNotifications = displayNotifications.map(normalizeForDisplay);
+
+  console.log('🔔 [Modal] Normalized display notifications:', normalizedDisplayNotifications);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -80,16 +125,7 @@ const NotificationsModal = ({
         {/* Tabs */}
         <div className="border-b">
           <div className="flex space-x-1 px-6">
-            <button
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                activeTab === 'all'
-                  ? 'bg-blue-100 text-blue-700 border-b-2 border-blue-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('all')}
-            >
-              All ({notifications.length})
-            </button>
+            
             <button
               className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                 activeTab === 'outOfStock'
@@ -98,24 +134,15 @@ const NotificationsModal = ({
               }`}
               onClick={() => setActiveTab('outOfStock')}
             >
-              Out of Stock ({outOfStockNotifications.length})
+              Out of Stock ({outOfStockNotifications?.length || 0})
             </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                activeTab === 'other'
-                  ? 'bg-gray-100 text-gray-700 border-b-2 border-gray-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('other')}
-            >
-              Other ({otherNotifications.length})
-            </button>
+            
           </div>
         </div>
 
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto p-6">
-          {displayNotifications.length === 0 ? (
+          {normalizedDisplayNotifications.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Bell className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No notifications found</p>
@@ -123,7 +150,7 @@ const NotificationsModal = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {displayNotifications.map((notification) => (
+              {normalizedDisplayNotifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={`p-4 rounded-lg border transition-colors ${
@@ -156,7 +183,10 @@ const NotificationsModal = ({
                       </p>
                       <div className="flex items-center space-x-4 text-xs text-gray-500">
                         <span>
-                          {new Date(notification.createdAt).toLocaleDateString()}
+                          {notification.createdAt 
+                            ? new Date(notification.createdAt).toLocaleDateString()
+                            : 'No date'
+                          }
                         </span>
                         {notification.priority && (
                           <span className={`px-2 py-1 rounded ${
@@ -182,6 +212,11 @@ const NotificationsModal = ({
                         Mark Read
                       </button>
                     )}
+                  </div>
+                  {/* Debug info - remove in production */}
+                  <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-500">
+                    <div>Raw ID: {notification._raw?.Id || notification._raw?.id || 'No ID'}</div>
+                    <div>Raw Type: {notification._raw?.Type || notification._raw?.type || 'No Type'}</div>
                   </div>
                 </div>
               ))}

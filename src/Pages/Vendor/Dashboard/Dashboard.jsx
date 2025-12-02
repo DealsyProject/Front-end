@@ -4,7 +4,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from 'react-router-dom';
 
 // Import components
-import MessagesModal from '../../../Components/Vendor/Dashboard/modals/MessagesModal';
 import NotificationsModal from '../../../Components/Vendor/Dashboard/modals/NotificationsModal';
 import Sidebar from "../../../Components/Vendor/Dashboard/Sidebar";
 import DashboardHeader from '../../../Components/Vendor/Dashboard/DashboardHeader';
@@ -20,7 +19,6 @@ import axiosInstance from '../../../Components/utils/axiosInstance';
 
 const Dashboard = () => {
   const [activeView, setActiveView] = useState('dashboard');
-  const [showMessages, setShowMessages] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
@@ -33,7 +31,6 @@ const Dashboard = () => {
     financialData,
     recentActivities,
     isLoading,
-    messageThreads,
     notifications: dashboardNotifications,
     fetchDashboardData
   } = useDashboardData(navigate);
@@ -62,43 +59,49 @@ const Dashboard = () => {
     refreshNotifications
   } = useNotificationHub();
 
-  
-const allNotifications = useMemo(() => {
-  console.log('📊 [Dashboard] Combining notifications');
-  console.log('   - Dashboard notifications (raw):', dashboardNotifications);
-  console.log('   - SignalR notifications (raw):', signalRNotifications);
-
-  // Use SignalR notifications as primary source when connected
-  const primaryNotifications = isConnected && signalRNotifications?.length > 0 
-    ? signalRNotifications 
-    : dashboardNotifications || [];
-
-  // Normalize notifications to ensure consistent structure
-  const normalized = primaryNotifications.map(n => {
-    const normalizedNotification = {
-      id: n.id,
-      type: n.type || '',
-      title: n.title || '',
-      message: n.message || '',
-      productId: n.productId,
-      createdAt: n.createdAt || n.createdOn,
-      isRead: n.isRead || false,
-      priority: n.priority || '',
-      isOutOfStock: n.isOutOfStock === true || 
-                    n.type?.toLowerCase() === 'out_of_stock' || 
-                    n.type?.toLowerCase() === 'out-of-stock',
-      source: isConnected ? 'signalr' : 'api',
-      // Include raw data for debugging
-      _raw: n
-    };
+  // Combine all notifications
+  const allNotifications = useMemo(() => {
+    console.log('📊 [Dashboard] Combining notifications');
     
-    console.log(`📊 [Dashboard] Normalized notification ${normalizedNotification.id}:`, normalizedNotification);
-    return normalizedNotification;
-  });
+    // Handle dashboard notifications (from API)
+    const normalizeNotification = (n) => ({
+      id: n.Id || n.id,
+      type: n.Type || n.type || '',
+      title: n.Title || n.title || '',
+      message: n.Message || n.message || '',
+      productId: n.ProductId || n.productId,
+      createdAt: n.CreatedAt || n.createdAt || n.createdOn,
+      isRead: n.IsRead || n.isRead || false,
+      priority: n.Priority || n.priority || '',
+      isOutOfStock: n.IsOutOfStock === true || 
+                    n.isOutOfStock === true ||
+                    (n.Type || n.type || '').toLowerCase() === 'out_of_stock',
+      productName: n.ProductName || n.productName,
+      vendorId: n.VendorId || n.vendorId,
+      source: 'api'
+    });
 
-  console.log('📊 [Dashboard] Final normalized notifications:', normalized);
-  return normalized;
-}, [signalRNotifications, dashboardNotifications, isConnected]);
+    // Normalize dashboard notifications
+    let normalizedDashboardNotifications = [];
+    if (dashboardNotifications) {
+      if (Array.isArray(dashboardNotifications)) {
+        normalizedDashboardNotifications = dashboardNotifications.map(normalizeNotification);
+      } else if (dashboardNotifications.notifications && Array.isArray(dashboardNotifications.notifications)) {
+        normalizedDashboardNotifications = dashboardNotifications.notifications.map(normalizeNotification);
+      } else if (dashboardNotifications.Notifications && Array.isArray(dashboardNotifications.Notifications)) {
+        normalizedDashboardNotifications = dashboardNotifications.Notifications.map(normalizeNotification);
+      }
+    }
+
+    // Use SignalR notifications as primary source when connected
+    const primaryNotifications = isConnected && signalRNotifications?.length > 0 
+      ? signalRNotifications 
+      : normalizedDashboardNotifications;
+
+    console.log('📊 [Dashboard] Final normalized notifications:', primaryNotifications);
+    return primaryNotifications;
+  }, [signalRNotifications, dashboardNotifications, isConnected]);
+
   // Separate out-of-stock notifications
   const outOfStockNotifications = useMemo(() => {
     const outOfStock = allNotifications.filter(n => n.isOutOfStock === true);
@@ -119,7 +122,6 @@ const allNotifications = useMemo(() => {
       
       if (success) {
         toast.success('Notification marked as read');
-        // Optionally refresh the dashboard data to sync with backend
         fetchDashboardData();
       } else {
         toast.error('Failed to mark notification as read');
@@ -130,23 +132,23 @@ const allNotifications = useMemo(() => {
     }
   }, [markNotificationAsRead, fetchDashboardData]);
 
- // Refresh all notifications
-const handleRefreshNotifications = useCallback(async () => {
-  console.log('🔄 [Dashboard] Refreshing notifications...');
-  
-  // Try SignalR first, then fallback to API
-  if (isConnected) {
-    const signalRSuccess = await refreshNotifications();
-    if (signalRSuccess) {
-      toast.success('Notifications refreshed');
-      return;
+  // Refresh all notifications
+  const handleRefreshNotifications = useCallback(async () => {
+    console.log('🔄 [Dashboard] Refreshing notifications...');
+    
+    // Try SignalR first, then fallback to API
+    if (isConnected) {
+      const signalRSuccess = await refreshNotifications();
+      if (signalRSuccess) {
+        toast.success('Notifications refreshed');
+        return;
+      }
     }
-  }
-  
-  // Fallback to API refresh
-  await fetchDashboardData();
-  toast.success('Notifications refreshed');
-}, [refreshNotifications, fetchDashboardData, isConnected]);
+    
+    // Fallback to API refresh
+    await fetchDashboardData();
+    toast.success('Notifications refreshed');
+  }, [refreshNotifications, fetchDashboardData, isConnected]);
 
   // Load data on mount
   useEffect(() => {
@@ -186,7 +188,7 @@ const handleRefreshNotifications = useCallback(async () => {
       <ToastContainer position="top-right" autoClose={3000} />
 
       {/* Connection Status Indicator */}
-      {/* <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg text-sm font-medium z-40 ${
+      <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg text-sm font-medium z-40 ${
         isConnected 
           ? 'bg-green-100 text-green-800 border border-green-300' 
           : connectionStatus === 'reconnecting'
@@ -199,16 +201,9 @@ const handleRefreshNotifications = useCallback(async () => {
             {unreadCount}
           </span>
         )}
-      </div> */}
+      </div>
 
-      {/* External Modals */}
-      {showMessages && (
-        <MessagesModal
-          setShowMessages={setShowMessages}
-          messageThreads={messageThreads}
-        />
-      )}
-
+      {/* Notifications Modal */}
       {showNotifications && (
         <NotificationsModal
           setShowNotifications={setShowNotifications}
@@ -235,12 +230,10 @@ const handleRefreshNotifications = useCallback(async () => {
         {/* Header with Profile Modal */}
         <DashboardHeader
           activeView={activeView}
-          setShowMessages={setShowMessages}
           setShowNotifications={setShowNotifications}
           showProfile={showProfile}
           setShowProfile={setShowProfile}
           handleLogout={handleLogout}
-          messageThreads={messageThreads}
           notifications={allNotifications}
           userData={userData}
           vendorData={vendorData}
@@ -265,9 +258,7 @@ const handleRefreshNotifications = useCallback(async () => {
           activeView={activeView}
           financialData={financialData}
           recentActivities={recentActivities}
-          setShowMessages={setShowMessages}
           setShowNotifications={setShowNotifications}
-          messageThreads={messageThreads}
           notifications={allNotifications}
           outOfStockNotifications={outOfStockNotifications}
           otherNotifications={otherNotifications}

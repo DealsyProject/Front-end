@@ -1,7 +1,7 @@
 // Components/Vendor/Dashboard/DashboardHeader.jsx
 import React from 'react';
 import ProfileModal from './modals/ProfileModal';
-import ProfileDisplay from './ProfileDisplay';
+import ProfileButton from './ProfileButton';
 import { AlertTriangle } from 'lucide-react';
 
 const DashboardHeader = ({
@@ -25,12 +25,25 @@ const DashboardHeader = ({
   handleProfileImageUpload,
   handleRemoveProfileImage,
   profileInputRef,
-  handleBackdropClick
+  handleBackdropClick,
+  onProfileNavigate // Add this prop to handle navigation
 }) => {
   // Count out-of-stock notifications
   const outOfStockCount = notifications?.filter(n => n.isOutOfStock && n.status === 'New')?.length || 0;
   const orderNotificationsCount = notifications?.filter(n => !n.isOutOfStock && n.status === 'New')?.length || 0;
   const totalNotificationsCount = outOfStockCount + orderNotificationsCount;
+
+  const handleProfileButtonClick = () => {
+    if (isProfileCreated) {
+      // Call the navigation handler passed from parent
+      if (onProfileNavigate) {
+        onProfileNavigate();
+      }
+    } else {
+      // Open modal to create profile
+      setShowProfile(true);
+    }
+  };
 
   return (
     <header className="bg-white shadow-sm p-4 flex justify-between items-center relative">
@@ -39,7 +52,11 @@ const DashboardHeader = ({
       </h2>
 
       <div className="flex items-center space-x-4">
-        
+        {/* Profile Button */}
+        <ProfileButton 
+          isProfileCreated={isProfileCreated}
+          onClick={handleProfileButtonClick}
+        />
 
         {/* Notification Button */}
         <button
@@ -62,20 +79,9 @@ const DashboardHeader = ({
             {outOfStockCount} Out of Stock
           </div>
         )}
-
-        {/* Profile Display */}
-        <ProfileDisplay
-          userData={userData}
-          vendorData={vendorData}
-          isProfileCreated={isProfileCreated}
-          profileForm={profileForm}
-          profilePreview={profilePreview}
-          setShowProfile={setShowProfile}
-          handleRemoveProfileImage={handleRemoveProfileImage}
-        />
       </div>
 
-      {/* Profile Modal - Render inside Header */}
+      {/* Profile Modal - Only show when creating/editing profile */}
       {showProfile && (
         <ProfileModal
           setShowProfile={setShowProfile}

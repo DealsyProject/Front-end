@@ -11,6 +11,7 @@ export const useProfile = (setShowProfile, fetchDashboardData) => {
     about: '',
   });
   const [profilePreview, setProfilePreview] = useState(null);
+  const [profileImageFile, setProfileImageFile] = useState(null);
   const [isProfileCreated, setIsProfileCreated] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const profileInputRef = useRef(null);
@@ -18,23 +19,36 @@ export const useProfile = (setShowProfile, fetchDashboardData) => {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const response = await axiosInstance.get('/vendorprofile'); // Fixed URL
-        const data = response.data;
+        console.log('🔄 Loading profile...');
+        const response = await axiosInstance.get('/vendorprofile');
+        console.log('📦 Profile response:', response.data);
 
-        if (data) {
+        // Handle the nested response structure: { Profile: {...} }
+        const profile = response.data?.Profile || response.data?.profile || response.data;
+        
+        console.log('✅ Extracted profile:', profile);
+
+        // Check if profile exists and has required data (support both camelCase and PascalCase)
+        if (profile && (profile.vendorName || profile.VendorName)) {
           setProfileForm({
-            vendorName: data.vendorName || '',
-            businessType: data.businessType || '',
-            description: data.description || '',
-            about: data.about || '',
+            vendorName: profile.vendorName || profile.VendorName || '',
+            businessType: profile.businessType || profile.BusinessType || '',
+            description: profile.description || profile.Description || '',
+            about: profile.about || profile.About || '',
           });
-          setProfilePreview(data.profileImage || null);
+          setProfilePreview(profile.profileImage || profile.ProfileImage || null);
           setIsProfileCreated(true);
+          console.log('✅ Profile loaded successfully - isProfileCreated set to TRUE');
+        } else {
+          console.log('ℹ️ No profile found');
+          setIsProfileCreated(false);
         }
       } catch (err) {
+        console.log('❌ Error loading profile:', err);
         if (err.response?.status !== 404) {
           console.warn('Failed to load profile:', err);
         }
+        setIsProfileCreated(false);
       }
     };
 
@@ -55,16 +69,27 @@ export const useProfile = (setShowProfile, fetchDashboardData) => {
       return;
     }
 
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size too large. Maximum size is 5MB.');
+      return;
+    }
+
+    // Store the actual file for upload
+    setProfileImageFile(file);
+
+    // Create preview
     const reader = new FileReader();
     reader.onload = (ev) => {
       setProfilePreview(ev.target?.result);
-      toast.success('Image uploaded');
+      toast.success('Image selected');
     };
     reader.readAsDataURL(file);
   };
 
   const handleRemoveProfileImage = () => {
     setProfilePreview(null);
+    setProfileImageFile(null);
     if (profileInputRef.current) profileInputRef.current.value = '';
     toast.info('Image removed');
   };
@@ -77,32 +102,64 @@ export const useProfile = (setShowProfile, fetchDashboardData) => {
     }
 
     setIsUpdating(true);
-    const payload = {
-      vendorName,
-      businessType,
-      description,
-      about,
-      profileImage: profilePreview
-    };
 
     try {
+      console.log('💾 Saving profile...');
+      
+      // Create FormData for multipart/form-data
+      const formData = new FormData();
+      formData.append('vendorName', vendorName);
+      formData.append('businessType', businessType);
+      formData.append('description', description);
+      formData.append('about', about);
+
+      // Only append image if a new file was selected
+      if (profileImageFile) {
+        formData.append('profileImage', profileImageFile);
+        console.log('📸 Including new profile image');
+      }
+
       let response;
       if (isProfileCreated) {
-        response = await axiosInstance.put('/vendorprofile', payload); // Fixed URL
+        console.log('🔄 Updating existing profile...');
+        response = await axiosInstance.put('/vendorprofile', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
       } else {
-        response = await axiosInstance.post('/vendorprofile', payload); // Fixed URL
+        console.log('➕ Creating new profile...');
+        response = await axiosInstance.post('/vendorprofile', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      }
+
+      console.log('✅ Profile saved:', response.data);
+      
+      // Update state with the new profile data (support both camelCase and PascalCase)
+      const savedProfile = response.data?.Profile || response.data?.profile || response.data;
+      if (savedProfile && (savedProfile.profileImage || savedProfile.ProfileImage)) {
+        setProfilePreview(savedProfile.profileImage || savedProfile.ProfileImage);
       }
 
       toast.success('Profile saved successfully!');
       setIsProfileCreated(true);
+      console.log('✅ Profile created flag set to TRUE');
+      
+      // Clear the file after successful upload
+      setProfileImageFile(null);
+      
       if (fetchDashboardData) fetchDashboardData();
 
     } catch (err) {
-      const msg = err.response?.data?.message ;
+      console.error('❌ Profile save error:', err);
+      const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.errorMessage || 'Failed to save profile';
       toast.error(msg);
     } finally {
       setIsUpdating(false);
-      setShowProfile(false); // Always close modal after save attempt
+      setShowProfile(false);
     }
   };
 

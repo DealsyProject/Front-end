@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Import components
+import MessagesModal from '../../../Components/Vendor/Dashboard/modals/MessagesModal';
 import NotificationsModal from '../../../Components/Vendor/Dashboard/modals/NotificationsModal';
 import Sidebar from "../../../Components/Vendor/Dashboard/Sidebar";
 import DashboardHeader from '../../../Components/Vendor/Dashboard/DashboardHeader';
@@ -15,14 +16,15 @@ import ErrorState from '../../../Components/Vendor/Dashboard/ErrorState';
 import { useDashboardData } from '../../../Components/Vendor/Dashboard/hooks/useDashboardData';
 import { useProfile } from '../../../Components/Vendor/Dashboard/hooks/useProfile';
 import { useNotificationHub } from '../../../Components/Vendor/Dashboard/hooks/useNotificationHub';
-import axiosInstance from '../../../Components/utils/axiosInstance';
 
 const Dashboard = () => {
   const [activeView, setActiveView] = useState('dashboard');
+  const [showMessages, setShowMessages] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Fetch dashboard data
   const {
@@ -31,6 +33,7 @@ const Dashboard = () => {
     financialData,
     recentActivities,
     isLoading,
+    messageThreads,
     notifications: dashboardNotifications,
     fetchDashboardData
   } = useDashboardData(navigate);
@@ -59,65 +62,56 @@ const Dashboard = () => {
     refreshNotifications
   } = useNotificationHub();
 
-  // Combine all notifications
-  const allNotifications = useMemo(() => {
-    console.log('📊 [Dashboard] Combining notifications');
-    
-    // Handle dashboard notifications (from API)
-    const normalizeNotification = (n) => ({
-      id: n.Id || n.id,
-      type: n.Type || n.type || '',
-      title: n.Title || n.title || '',
-      message: n.Message || n.message || '',
-      productId: n.ProductId || n.productId,
-      createdAt: n.CreatedAt || n.createdAt || n.createdOn,
-      isRead: n.IsRead || n.isRead || false,
-      priority: n.Priority || n.priority || '',
-      isOutOfStock: n.IsOutOfStock === true || 
-                    n.isOutOfStock === true ||
-                    (n.Type || n.type || '').toLowerCase() === 'out_of_stock',
-      productName: n.ProductName || n.productName,
-      vendorId: n.VendorId || n.vendorId,
-      source: 'api'
-    });
-
-    // Normalize dashboard notifications
-    let normalizedDashboardNotifications = [];
-    if (dashboardNotifications) {
-      if (Array.isArray(dashboardNotifications)) {
-        normalizedDashboardNotifications = dashboardNotifications.map(normalizeNotification);
-      } else if (dashboardNotifications.notifications && Array.isArray(dashboardNotifications.notifications)) {
-        normalizedDashboardNotifications = dashboardNotifications.notifications.map(normalizeNotification);
-      } else if (dashboardNotifications.Notifications && Array.isArray(dashboardNotifications.Notifications)) {
-        normalizedDashboardNotifications = dashboardNotifications.Notifications.map(normalizeNotification);
-      }
+  // Check if should open profile modal from navigation state
+  useEffect(() => {
+    console.log('📍 Location state:', location.state);
+    if (location.state?.openProfileModal) {
+      console.log('✅ Opening profile modal from navigation state');
+      setShowProfile(true);
+      // Clear the state to prevent reopening on refresh
+      navigate(location.pathname, { replace: true, state: {} });
     }
+  }, [location, navigate]);
 
-    // Use SignalR notifications as primary source when connected
+  // Log profile creation status
+  useEffect(() => {
+    console.log('👤 Profile created status:', isProfileCreated);
+  }, [isProfileCreated]);
+
+  const allNotifications = useMemo(() => {
     const primaryNotifications = isConnected && signalRNotifications?.length > 0 
       ? signalRNotifications 
-      : normalizedDashboardNotifications;
+      : dashboardNotifications || [];
 
-    console.log('📊 [Dashboard] Final normalized notifications:', primaryNotifications);
-    return primaryNotifications;
+    const normalized = primaryNotifications.map(n => ({
+      id: n.id,
+      type: n.type || '',
+      title: n.title || '',
+      message: n.message || '',
+      productId: n.productId,
+      createdAt: n.createdAt || n.createdOn,
+      isRead: n.isRead || false,
+      priority: n.priority || '',
+      isOutOfStock: n.isOutOfStock === true || 
+                    n.type?.toLowerCase() === 'out_of_stock' || 
+                    n.type?.toLowerCase() === 'out-of-stock',
+      source: isConnected ? 'signalr' : 'api',
+      _raw: n
+    }));
+
+    return normalized;
   }, [signalRNotifications, dashboardNotifications, isConnected]);
 
-  // Separate out-of-stock notifications
   const outOfStockNotifications = useMemo(() => {
-    const outOfStock = allNotifications.filter(n => n.isOutOfStock === true);
-    console.log('📦 [Dashboard] Out-of-stock notifications:', outOfStock.length);
-    return outOfStock;
+    return allNotifications.filter(n => n.isOutOfStock === true);
   }, [allNotifications]);
 
-  // Other notifications (non out-of-stock)
   const otherNotifications = useMemo(() => {
     return allNotifications.filter(n => !n.isOutOfStock);
   }, [allNotifications]);
 
-  // Handle notification marked as read
   const handleMarkNotificationAsRead = useCallback(async (notificationId) => {
     try {
-      console.log('📝 [Dashboard] Marking notification as read:', notificationId);
       const success = await markNotificationAsRead(notificationId);
       
       if (success) {
@@ -127,16 +121,12 @@ const Dashboard = () => {
         toast.error('Failed to mark notification as read');
       }
     } catch (error) {
-      console.error('❌ [Dashboard] Error marking notification as read:', error);
+      console.error('❌ Error marking notification as read:', error);
       toast.error('Failed to mark notification as read');
     }
   }, [markNotificationAsRead, fetchDashboardData]);
 
-  // Refresh all notifications
   const handleRefreshNotifications = useCallback(async () => {
-    console.log('🔄 [Dashboard] Refreshing notifications...');
-    
-    // Try SignalR first, then fallback to API
     if (isConnected) {
       const signalRSuccess = await refreshNotifications();
       if (signalRSuccess) {
@@ -145,26 +135,25 @@ const Dashboard = () => {
       }
     }
     
-    // Fallback to API refresh
     await fetchDashboardData();
     toast.success('Notifications refreshed');
   }, [refreshNotifications, fetchDashboardData, isConnected]);
 
-  // Load data on mount
+  const handleProfileNavigate = useCallback(() => {
+    console.log('🚀 Navigating to profile view page...');
+    console.log('   Profile created:', isProfileCreated);
+    
+    if (isProfileCreated) {
+      navigate('/vendor/profile');
+    } else {
+      console.log('⚠️ Profile not created yet, opening modal instead');
+      setShowProfile(true);
+    }
+  }, [navigate, isProfileCreated]);
+
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
-
-  // Show connection status
-  useEffect(() => {
-    console.log('🔌 [Dashboard] SignalR Connection Status:', connectionStatus);
-    console.log('   Connected:', isConnected);
-    console.log('   Unread Count:', unreadCount);
-    
-    if (isConnected) {
-      console.log('✅ [Dashboard] Real-time notifications enabled');
-    }
-  }, [connectionStatus, isConnected, unreadCount]);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
@@ -179,7 +168,6 @@ const Dashboard = () => {
     }
   };
 
-  // Loading & error states
   if (isLoading) return <LoadingState />;
   if (!userData) return <ErrorState message="Unable to load user data" />;
 
@@ -187,23 +175,14 @@ const Dashboard = () => {
     <div className="flex h-screen bg-gray-100">
       <ToastContainer position="top-right" autoClose={3000} />
 
-      {/* Connection Status Indicator */}
-      <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg text-sm font-medium z-40 ${
-        isConnected 
-          ? 'bg-green-100 text-green-800 border border-green-300' 
-          : connectionStatus === 'reconnecting'
-          ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-          : 'bg-red-100 text-red-800 border border-red-300'
-      }`}>
-        {isConnected ? '🔔 Real-time Enabled' : `🔌 ${connectionStatus}`}
-        {unreadCount > 0 && (
-          <span className="ml-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs">
-            {unreadCount}
-          </span>
-        )}
-      </div>
+      {/* External Modals */}
+      {showMessages && (
+        <MessagesModal
+          setShowMessages={setShowMessages}
+          messageThreads={messageThreads}
+        />
+      )}
 
-      {/* Notifications Modal */}
       {showNotifications && (
         <NotificationsModal
           setShowNotifications={setShowNotifications}
@@ -230,10 +209,12 @@ const Dashboard = () => {
         {/* Header with Profile Modal */}
         <DashboardHeader
           activeView={activeView}
+          setShowMessages={setShowMessages}
           setShowNotifications={setShowNotifications}
           showProfile={showProfile}
           setShowProfile={setShowProfile}
           handleLogout={handleLogout}
+          messageThreads={messageThreads}
           notifications={allNotifications}
           userData={userData}
           vendorData={vendorData}
@@ -251,6 +232,7 @@ const Dashboard = () => {
           unreadCount={unreadCount}
           connectionStatus={connectionStatus}
           outOfStockCount={outOfStockNotifications.length}
+          onProfileNavigate={handleProfileNavigate}
         />
 
         {/* Main Dashboard Content */}
@@ -258,7 +240,9 @@ const Dashboard = () => {
           activeView={activeView}
           financialData={financialData}
           recentActivities={recentActivities}
+          setShowMessages={setShowMessages}
           setShowNotifications={setShowNotifications}
+          messageThreads={messageThreads}
           notifications={allNotifications}
           outOfStockNotifications={outOfStockNotifications}
           otherNotifications={otherNotifications}

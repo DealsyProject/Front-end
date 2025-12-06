@@ -10,16 +10,13 @@ const Invoices = () => {
   const [activeTab, setActiveTab] = useState('orders');
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [invoices, setInvoices] = useState([]);
-  const [returns, setReturns] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [loading, setLoading] = useState(false);
 
   // Modals
   const [showShipmentModal, setShowShipmentModal] = useState(false);
-  const [showReturnModal, setShowReturnModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
-  const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState(null);
 
   const [shipmentDetails, setShipmentDetails] = useState({
     shipmentDate: '',
@@ -28,31 +25,10 @@ const Invoices = () => {
     items: []
   });
 
-  const [returnDetails, setReturnDetails] = useState({
-    returnDate: '',
-    carrierName: '',
-    carrierPhoneNumber: '',
-    trackingId: '',
-    customerReason: '',
-    items: []
-  });
-
-  const returnAddress = {
-    name: 'Dealsy',
-    street: '123 Dealsy Plaza',
-    city: 'Kozhikode',
-    state: 'Kerala',
-    zipCode: '400059',
-    country: 'India',
-    phone: '+91 22 6789 4321',
-    email: 'SupportDealsy@gmail.com'
-  };
-
   useEffect(() => {
     const fetchData = async () => {
       await fetchVendorOrders();
       await fetchInvoices();
-      await fetchReturns();
     };
     fetchData();
   }, []);
@@ -209,31 +185,6 @@ const Invoices = () => {
     }
   };
 
-  const fetchReturns = async () => {
-    try {
-      const response = await axiosInstance.get('/Order/vendor/returns');
-      const returnsData = response.data.returns || [];
-      
-      const transformedReturns = returnsData.map(ret => ({
-        returnId: ret.returnId || ret.ReturnId || `RET${ret.id || Date.now()}`,
-        orderId: ret.orderId || ret.OrderId,
-        invoiceId: ret.invoiceId || ret.InvoiceId,
-        date: ret.returnDate || ret.ReturnDate || ret.date,
-        reason: ret.reason || ret.Reason || 'No reason provided',
-        status: ret.status || ret.Status || 'Processed',
-        carrierName: ret.carrierName || ret.CarrierName || '',
-        trackingId: ret.trackingId || ret.TrackingId || '',
-        items: ret.items || ret.Items || []
-      }));
-      
-      setReturns(transformedReturns);
-    } catch (error) {
-      console.error('Error fetching returns:', error);
-      // Show empty state if no returns or API error
-      setReturns([]);
-    }
-  };
-
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('currentUser');
@@ -294,98 +245,9 @@ const Invoices = () => {
     }
   };
 
-  const openReturnModal = (invoice) => {
-    const po = purchaseOrders.find(p => p.orderId === invoice.orderId);
-    if (po?.deliveryStatus !== 'delivered') {
-      toast.error('Order must be delivered before processing return.');
-      return;
-    }
-
-    setSelectedInvoiceForReturn(invoice);
-    
-    // Use invoice.Items (capital I) instead of invoice.items
-    const invoiceItems = invoice.Items || invoice.items || [];
-    
-    setReturnDetails({
-      returnDate: new Date().toISOString().split('T')[0],
-      carrierName: '',
-      carrierPhoneNumber: '',
-      trackingId: '',
-      customerReason: po.returnReason || 'No reason provided',
-      items: invoiceItems.map(item => ({
-        ...item,
-        returnedQty: 0,
-        customerSelected: false,
-        productName: item.ProductName || item.productName,
-        quantity: item.Quantity || item.quantity,
-        price: item.Price || item.price,
-        ProductId: item.ProductId || item.productId
-      })) || []
-    });
-    setShowReturnModal(true);
-  };
-
-  const processReturn = async () => {
-    if (!returnDetails.carrierName.trim() || !returnDetails.trackingId.trim()) {
-      toast.error('Carrier Name and Tracking ID are required!');
-      return;
-    }
-    
-    const totalReturned = returnDetails.items.reduce((acc, i) => acc + (i.returnedQty || 0), 0);
-    if (totalReturned === 0) {
-      toast.error('Select at least one item to return.');
-      return;
-    }
-
-    try {
-      const returnedItems = returnDetails.items
-        .filter(i => i.returnedQty > 0)
-        .map(i => ({
-          productId: i.ProductId || i.productId,
-          productName: i.ProductName || i.productName,
-          quantity: i.returnedQty,
-          price: i.Price || i.price || 0
-        }));
-
-      // Call the new return API endpoint
-      const response = await axiosInstance.post('/Order/return', {
-        orderId: selectedInvoiceForReturn.orderId,
-        invoiceId: selectedInvoiceForReturn.invoiceId,
-        returnDate: returnDetails.returnDate,
-        carrierName: returnDetails.carrierName,
-        carrierPhoneNumber: returnDetails.carrierPhoneNumber,
-        trackingId: returnDetails.trackingId,
-        reason: returnDetails.customerReason,
-        items: returnedItems
-      });
-
-      toast.success('Return processed successfully!');
-      
-      // Update invoice status to Returned
-      setInvoices(prev =>
-        prev.map(inv =>
-          inv.orderId === selectedInvoiceForReturn.orderId
-            ? { ...inv, confirmationStatus: 'Returned' }
-            : inv
-        )
-      );
-      
-      setShowReturnModal(false);
-      
-      // Refresh returns data
-      await fetchReturns();
-      
-      // Switch to returns tab
-      setActiveTab('returns');
-    } catch (error) {
-      console.error('Error processing return:', error);
-      toast.error(error.response?.data?.message || 'Failed to process return');
-    }
-  };
-
   const calculateTotal = (items) => {
     if (!items) return 0;
-    return items.reduce((sum, i) => sum + ((i.Quantity || i.quantity || i.shippedQty || i.returnedQty || 0) * (i.Price || i.price || i.unitPrice || 0)), 0);
+    return items.reduce((sum, i) => sum + ((i.Quantity || i.quantity || 0) * (i.Price || i.price || 0)), 0);
   };
 
   const formatCurrency = (amt) => new Intl.NumberFormat('en-IN', { 
@@ -412,12 +274,10 @@ const Invoices = () => {
     const status = invoice.confirmationStatus || 'Pending';
     
     const statusConfig = {
-      'Returned': 'bg-purple-100 text-purple-800',
       'Confirmed': 'bg-green-100 text-green-800',
       'Paid': 'bg-green-100 text-green-800',
       'Paided': 'bg-green-100 text-green-800',
       'Pending': 'bg-yellow-100 text-yellow-800',
-      'Refunded': 'bg-red-100 text-red-800'
     };
     
     return {
@@ -507,7 +367,6 @@ const Invoices = () => {
             .status-confirmed { background: #d1fae5; color: #065f46; }
             .status-cancelled { background: #fee2e2; color: #dc2626; }
             .status-paid { background: #d1fae5; color: #065f46; }
-            .status-returned { background: #e9d5ff; color: #6b21a8; }
             table { 
               width: 100%; 
               border-collapse: collapse; 
@@ -611,8 +470,6 @@ const Invoices = () => {
               <span class="status-badge ${
                 confirmationStatus.toLowerCase() === 'confirmed' ? 'status-confirmed' :
                 confirmationStatus.toLowerCase() === 'paid' ? 'status-paid' :
-                confirmationStatus.toLowerCase() === 'returned' ? 'status-returned' :
-                confirmationStatus.toLowerCase() === 'refunded' ? 'status-returned' :
                 'status-pending'
               }">${confirmationStatus}</span>
             </div>
@@ -720,8 +577,8 @@ const Invoices = () => {
         <Sidebar handleLogout={handleLogout} activeView="invoices" />
 
         <div className="flex-1 p-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Order, Invoice & Return Management</h1>
-          <p className="text-gray-600 mb-8">Pending → Shipped → Delivered → Returns</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Order & Invoice Management</h1>
+          <p className="text-gray-600 mb-8">Pending → Shipped → Delivered</p>
 
           {/* Tabs */}
           <div className="flex border-b border-gray-200 mb-8">
@@ -736,12 +593,6 @@ const Invoices = () => {
               className={`px-6 py-3 font-medium ${activeTab === 'invoices' ? 'text-[#586330] border-b-2 border-[#586330]' : 'text-gray-500'}`}
             >
               Invoices ({invoices.length})
-            </button>
-            <button 
-              onClick={() => setActiveTab('returns')} 
-              className={`px-6 py-3 font-medium ${activeTab === 'returns' ? 'text-[#586330] border-b-2 border-[#586330]' : 'text-gray-500'}`}
-            >
-              Returns ({returns.length})
             </button>
           </div>
 
@@ -891,143 +742,84 @@ const Invoices = () => {
           )}
 
           {/* Invoices Tab */}
-         {!loading && activeTab === 'invoices' && viewMode === 'list' && (
-  <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-    <table className="w-full">
-      <thead className="bg-[#586330] text-white">
-        <tr>
-          <th className="px-6 py-4 text-left">Invoice ID</th>
-          <th className="px-6 py-4 text-left">Order ID</th>
-          <th className="px-6 py-4 text-left">Customer</th>
-          <th className="px-6 py-4 text-left">Amount</th>
-          <th className="px-6 py-4 text-left">Date</th>
-          <th className="px-6 py-4 text-left">Order Status</th>
-          <th className="px-6 py-4 text-left">Payment Status</th>
-          <th className="px-6 py-4 text-left">Tracking Id</th>
-          <th className="px-6 py-4 text-left">Actions</th>
-        </tr>
-      </thead>
-                <tbody>
-                  {invoices.map(inv => {
-          const total = inv.amount || calculateTotal(inv.items);
-          
-          // Order Status Badge
-          const orderStatusBadge = {
-            text: inv.orderStatus || 'Pending',
-            class: inv.orderStatus?.toLowerCase() === 'delivered' ? 'bg-green-100 text-green-800' :
-                   inv.orderStatus?.toLowerCase() === 'shipped' ? 'bg-blue-100 text-blue-800' :
-                   inv.orderStatus?.toLowerCase() === 'cancelled' ? 'bg-red-100 text-red-800' :
-                   'bg-yellow-100 text-yellow-800'
-          };
-                    
-                    // Payment Status from stored confirmation status
-                   const invoiceStatus = getInvoiceStatus(inv);
-          
-          // Show return button ONLY when payment status is "Returned"
-          const showReturnButton = invoiceStatus.text === 'Returned';
-                    
-                   return (
-            <tr key={inv.invoiceId} className="border-b hover:bg-[#F5F1E8]">
-              <td className="px-6 py-4 font-medium">{inv.invoiceNumber || inv.invoiceId}</td>
-              <td className="px-6 py-4">Order {inv.orderId}</td>
-              <td className="px-6 py-4">
-                <div>
-                  <div className="font-medium">{inv.customer?.name || 'Unknown Customer'}</div>
-                  <div className="text-sm text-gray-500">{inv.customer?.email}</div>
-                </div>
-              </td>
-              <td className="px-6 py-4 font-bold text-[#586330]">{formatCurrency(total)}</td>
-              <td className="px-6 py-4 text-sm text-gray-600">{formatDate(inv.invoiceDate || inv.date)}</td>
-              <td className="px-6 py-4">
-                <span className={`px-2 py-1 rounded text-xs ${orderStatusBadge.class}`}>
-                  {orderStatusBadge.text}
-                </span>
-              </td>
-              <td className="px-6 py-4">
-                <span className={`px-2 py-1 rounded text-xs ${invoiceStatus.class}`}>
-                  {invoiceStatus.text}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-sm font-mono">{inv.trackingNumber || inv.shipment?.trackingNumber || 'N/A'}</td>
-              <td className="px-6 py-4">
-                <button 
-                  onClick={() => handlePrintInvoice(inv)} 
-                  className="text-white bg-gray-600 px-2 mr-3 hover:underline"
-                >
-                  Print
-                </button>
-                <button 
-                  onClick={() => handleSendInvoice(inv)} 
-                  className="text-green-600 mt-2 bg-green-100 px-2 mr-3 hover:underline"
-                >
-                  Email
-                </button>
-                {showReturnButton && (
-                  <button 
-                    onClick={() => openReturnModal(inv)} 
-                    className="text-red-600 hover:underline"
-                  >
-                    Return
-                  </button>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-        {invoices.length === 0 && (
-          <tr>
-            <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
-              No invoices found. Ship an order to generate invoices.
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
-)}
-
-          {/* Returns Tab */}
-          {!loading && activeTab === 'returns' && (
+          {!loading && activeTab === 'invoices' && viewMode === 'list' && (
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               <table className="w-full">
                 <thead className="bg-[#586330] text-white">
                   <tr>
-                    <th className="px-6 py-4 text-left">Return ID</th>
+                    <th className="px-6 py-4 text-left">Invoice ID</th>
                     <th className="px-6 py-4 text-left">Order ID</th>
+                    <th className="px-6 py-4 text-left">Customer</th>
+                    <th className="px-6 py-4 text-left">Amount</th>
                     <th className="px-6 py-4 text-left">Date</th>
-                    <th className="px-6 py-4 text-left">Reason</th>
-                    <th className="px-6 py-4 text-left">Carrier</th>
-                    <th className="px-6 py-4 text-left">Tracking ID</th>
-                    <th className="px-6 py-4 text-left">Status</th>
+                    <th className="px-6 py-4 text-left">Order Status</th>
+                    <th className="px-6 py-4 text-left">Payment Status</th>
+                    <th className="px-6 py-4 text-left">Tracking Id</th>
+                    <th className="px-6 py-4 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {returns.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-10 text-gray-500">
-                        No returns yet
-                      </td>
-                    </tr>
-                  ) : (
-                    returns.map(r => (
-                      <tr key={r.returnId} className="border-b hover:bg-[#F5F1E8]">
-                        <td className="px-6 py-4 font-medium">{r.returnId}</td>
-                        <td className="px-6 py-4">Order {r.orderId}</td>
-                        <td className="px-6 py-4">{formatDate(r.date)}</td>
-                        <td className="px-6 py-4">{r.reason || 'No reason provided'}</td>
-                        <td className="px-6 py-4">{r.carrierName || 'N/A'}</td>
-                        <td className="px-6 py-4 font-mono text-sm">{r.trackingId || 'N/A'}</td>
+                  {invoices.map(inv => {
+                    const total = inv.amount || calculateTotal(inv.items);
+                    
+                    // Order Status Badge
+                    const orderStatusBadge = {
+                      text: inv.orderStatus || 'Pending',
+                      class: inv.orderStatus?.toLowerCase() === 'delivered' ? 'bg-green-100 text-green-800' :
+                             inv.orderStatus?.toLowerCase() === 'shipped' ? 'bg-blue-100 text-blue-800' :
+                             inv.orderStatus?.toLowerCase() === 'cancelled' ? 'bg-red-100 text-red-800' :
+                             'bg-yellow-100 text-yellow-800'
+                    };
+                    
+                    // Payment Status from stored confirmation status
+                    const invoiceStatus = getInvoiceStatus(inv);
+                    
+                    return (
+                      <tr key={inv.invoiceId} className="border-b hover:bg-[#F5F1E8]">
+                        <td className="px-6 py-4 font-medium">{inv.invoiceNumber || inv.invoiceId}</td>
+                        <td className="px-6 py-4">Order {inv.orderId}</td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            r.status === 'Processed' ? 'bg-green-100 text-green-800' : 
-                            r.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {r.status || 'Processed'}
+                          <div>
+                            <div className="font-medium">{inv.customer?.name || 'Unknown Customer'}</div>
+                            <div className="text-sm text-gray-500">{inv.customer?.email}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-[#586330]">{formatCurrency(total)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{formatDate(inv.invoiceDate || inv.date)}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs ${orderStatusBadge.class}`}>
+                            {orderStatusBadge.text}
                           </span>
                         </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs ${invoiceStatus.class}`}>
+                            {invoiceStatus.text}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-mono">{inv.trackingNumber || inv.shipment?.trackingNumber || 'N/A'}</td>
+                        <td className="px-6 py-4">
+                          <button 
+                            onClick={() => handlePrintInvoice(inv)} 
+                            className="text-white bg-gray-600 px-2 mr-3 hover:underline"
+                          >
+                            Print
+                          </button>
+                          <button 
+                            onClick={() => handleSendInvoice(inv)} 
+                            className="text-green-600 mt-2 bg-green-100 px-2 mr-3 hover:underline"
+                          >
+                            Email
+                          </button>
+                        </td>
                       </tr>
-                    ))
+                    );
+                  })}
+                  {invoices.length === 0 && (
+                    <tr>
+                      <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
+                        No invoices found. Ship an order to generate invoices.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -1106,113 +898,6 @@ const Invoices = () => {
                       className="px-8 py-3 bg-[#586330] text-white rounded-lg"
                     >
                       Confirm & Generate Invoice
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Return Modal */}
-          {showReturnModal && selectedInvoiceForReturn && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-screen overflow-y-auto">
-                <div className="bg-[#586330] text-white p-6 rounded-t-2xl">
-                  <h2 className="text-2xl font-bold">Return Order</h2>
-                </div>
-                <div className="p-8">
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block font-medium mb-2">Return Date *</label>
-                      <input 
-                        type="date" 
-                        value={returnDetails.returnDate} 
-                        onChange={e => setReturnDetails(prev => ({ ...prev, returnDate: e.target.value }))} 
-                        className="w-full px-4 py-3 border rounded-lg" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-medium mb-2">Carrier Name *</label>
-                      <input 
-                        type="text" 
-                        placeholder="FedEx, Delhivery, etc." 
-                        value={returnDetails.carrierName} 
-                        onChange={e => setReturnDetails(prev => ({ ...prev, carrierName: e.target.value }))} 
-                        className="w-full px-4 py-3 border rounded-lg" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block font-medium mb-2">Carrier Phone Number</label>
-                      <input 
-                        type="text" 
-                        placeholder="+91 98765 43210" 
-                        value={returnDetails.carrierPhoneNumber} 
-                        onChange={e => setReturnDetails(prev => ({ ...prev, carrierPhoneNumber: e.target.value }))} 
-                        className="w-full px-4 py-3 border rounded-lg" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-medium mb-2">Tracking ID *</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. RET123456789" 
-                        value={returnDetails.trackingId} 
-                        onChange={e => setReturnDetails(prev => ({ ...prev, trackingId: e.target.value }))} 
-                        className="w-full px-4 py-3 border rounded-lg" 
-                      />
-                    </div>
-                  </div>
-
-                  {/* Return Address Section */}
-                  <div className="mb-6">
-                    <label className="block font-medium mb-2">Return Shipping Address</label>
-                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                      <p className="font-medium text-green-800 mb-2">Ship returns to:</p>
-                      <div className="text-gray-700">
-                        <p className="font-semibold">{returnAddress.name}</p>
-                        <p>{returnAddress.street}</p>
-                        <p>{returnAddress.city}, {returnAddress.state} {returnAddress.zipCode}</p>
-                        <p>{returnAddress.country}</p>
-                        <p className="mt-2">📞 {returnAddress.phone}</p>
-                        <p>✉ {returnAddress.email}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <label className="block font-medium mb-2">Customer Reason for Return</label>
-                    <div className="p-4 bg-gray-50 rounded-lg border">
-                      <p className="text-gray-700">{returnDetails.customerReason}</p>
-                    </div>
-                  </div>
-
-                  <h3 className="font-bold text-lg mb-4">Items for Return</h3>
-                  {returnDetails.items.map((item, i) => (
-                    <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg mb-3">
-                      <div className="flex-1">
-                        <p className="font-medium">{item.ProductName || item.productName}</p>
-                        <p className="text-sm text-gray-600">Delivered: {item.Quantity || item.quantity || 0}</p>
-                        <p className="text-sm text-gray-600">Price: {formatCurrency(item.Price || item.price)}</p>
-                      </div>
-                      
-                    </div>
-                  ))}
-
-                  <div className="flex justify-end gap-4 mt-8">
-                    <button 
-                      onClick={() => setShowReturnModal(false)} 
-                      className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={processReturn} 
-                      className="px-8 py-3 bg-[#586330] text-white rounded-lg "
-                    >
-                      Process Return
                     </button>
                   </div>
                 </div>

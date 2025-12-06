@@ -38,7 +38,7 @@ import VendorRegister from './Components/Vendor/Registration/VendorExtraForm.jsx
 
 import Dashboard from './Pages/Vendor/Dashboard/Dashboard';
 import Products from './Pages/Vendor/Dashboard/Products';
-
+import ProfileViewPage from './Pages/Vendor/Dashboard/ProfileViewPage.jsx';
 import Customers from './Pages/Vendor/Dashboard/Customers';
 import Invoices from './Pages/Vendor/Dashboard/Invoices';
 import Payments from './Pages/Vendor/Dashboard/Payments';
@@ -86,6 +86,7 @@ function App() {
         
       
         <Route path="/vendor-dashboard" element={<Dashboard />} />
+       <Route path="/vendor/profile" element={<ProfileViewPage />} />
         <Route path="/products" element={<Products />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/invoices" element={<Invoices />} />

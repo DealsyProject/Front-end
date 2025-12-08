@@ -3,7 +3,6 @@ import { AlertTriangle } from 'lucide-react';
 import FinancialOverview from './FinancialOverview';
 import RecentActivities from './RecentActivities';
 
-
 const DashboardMain = ({
   activeView,
   financialData,
@@ -12,7 +11,8 @@ const DashboardMain = ({
   setShowNotifications,
   messageThreads,
   notifications,
-  outOfStockNotifications
+  outOfStockNotifications,
+  isLoading
 }) => {
   // Count urgent out-of-stock notifications
   const urgentOutOfStockCount = outOfStockNotifications?.length || 0;
@@ -45,12 +45,11 @@ const DashboardMain = ({
         </div>
       )}
 
-      <div className=" gap-6">
+      <div className="gap-6">
         <div className="lg:col-span-2 space-y-6">
           <FinancialOverview financialData={financialData} />
-          <RecentActivities recentActivities={recentActivities} />
+          <RecentActivities recentActivities={recentActivities} isLoading={isLoading} />
         </div>
-        
       </div>
     </main>
   );

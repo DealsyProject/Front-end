@@ -1,13 +1,13 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import axiosInstance from '../../../../Components/utils/axiosInstance'; // Adjust path as needed
+import axiosInstance from '../../../../Components/utils/axiosInstance';
 
 export const useDashboardData = (navigate) => {
   const [userData, setUserData] = useState(null);
   const [vendorData, setVendorData] = useState(null);
   const [financialData, setFinancialData] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
-  const [notifications, setNotifications] = useState([]); // Changed from mock to real state
+  const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [messageThreads] = useState([
@@ -22,39 +22,37 @@ export const useDashboardData = (navigate) => {
       
       const notificationResponse = await axiosInstance.get('/Notification/vendor-out-of-stock');
     
-    // Handle both response formats
-    let notificationsArray = [];
-    
-    if (Array.isArray(notificationResponse.data)) {
-      notificationsArray = notificationResponse.data;
-    } else if (notificationResponse.data.notifications && Array.isArray(notificationResponse.data.notifications)) {
-      notificationsArray = notificationResponse.data.notifications;
-    } else if (notificationResponse.data.Notifications && Array.isArray(notificationResponse.data.Notifications)) {
-      notificationsArray = notificationResponse.data.Notifications;
-    }
-    
-    // Normalize notifications
-    const normalizedNotifications = notificationsArray.map(notification => ({
-      id: notification.Id || notification.id,
-      type: notification.Type || notification.type || '',
-      title: notification.Title || notification.title || '',
-      message: notification.Message || notification.message || '',
-      productId: notification.ProductId || notification.productId,
-      createdAt: notification.CreatedAt || notification.createdAt || notification.createdOn,
-      isRead: notification.IsRead || notification.isRead || false,
-      priority: notification.Priority || notification.priority || '',
-      isOutOfStock: notification.IsOutOfStock === true || 
-                    notification.isOutOfStock === true ||
-                    (notification.Type || notification.type || '').toLowerCase() === 'out_of_stock',
-      productName: notification.ProductName || notification.productName,
-      vendorId: notification.VendorId || notification.vendorId,
-      source: 'api'
-    }));
-    
-    setNotifications(normalizedNotifications);
+      let notificationsArray = [];
+      
+      if (Array.isArray(notificationResponse.data)) {
+        notificationsArray = notificationResponse.data;
+      } else if (notificationResponse.data.notifications && Array.isArray(notificationResponse.data.notifications)) {
+        notificationsArray = notificationResponse.data.notifications;
+      } else if (notificationResponse.data.Notifications && Array.isArray(notificationResponse.data.Notifications)) {
+        notificationsArray = notificationResponse.data.Notifications;
+      }
+      
+      const normalizedNotifications = notificationsArray.map(notification => ({
+        id: notification.Id || notification.id,
+        type: notification.Type || notification.type || '',
+        title: notification.Title || notification.title || '',
+        message: notification.Message || notification.message || '',
+        productId: notification.ProductId || notification.productId,
+        createdAt: notification.CreatedAt || notification.createdAt || notification.createdOn,
+        isRead: notification.IsRead || notification.isRead || false,
+        priority: notification.Priority || notification.priority || '',
+        isOutOfStock: notification.IsOutOfStock === true || 
+                      notification.isOutOfStock === true ||
+                      (notification.Type || notification.type || '').toLowerCase() === 'out_of_stock',
+        productName: notification.ProductName || notification.productName,
+        vendorId: notification.VendorId || notification.vendorId,
+        source: 'api'
+      }));
+      
+      setNotifications(normalizedNotifications);
 
     } catch (error) {
-      console.error('❌ Error fetching dashboard data:', error);
+      console.error('❌ Error fetching notifications:', error);
     }
   }, []);
 
@@ -77,36 +75,107 @@ export const useDashboardData = (navigate) => {
     }
   }, []);
 
- const fetchFinancialData = useCallback(async () => {
-  try {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const mockFinancialData = [
-      { title: 'Total Revenue', value: '₹25,430.00', subtitle: '+12% from last month' },
-      { title: 'Total Refunded', value: '₹1,340.00', subtitle: '5 refund requests' },
-      { title: 'Overdue Bills', value: '₹2,340.00', subtitle: '2 overdue payments' }
-    ];
-    
-    setFinancialData(mockFinancialData);
-  } catch (error) {
-    console.error('Error loading financial data:', error);
-    setFinancialData(getDefaultFinancialData());
-  }
-}, []);
+  const fetchFinancialData = useCallback(async () => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const mockFinancialData = [
+        { title: 'Total Revenue', value: '₹25,430.00', subtitle: '+12% from last month' },
+        { title: 'Total Refunded', value: '₹1,340.00', subtitle: '5 refund requests' },
+        { title: 'Overdue Bills', value: '₹2,340.00', subtitle: '2 overdue payments' }
+      ];
+      
+      setFinancialData(mockFinancialData);
+    } catch (error) {
+      console.error('Error loading financial data:', error);
+      setFinancialData(getDefaultFinancialData());
+    }
+  }, []);
 
   const fetchRecentActivities = useCallback(async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 400));
+      console.log('📊 Fetching recent activities...');
       
-      const mockActivities = [
-        { type: 'Customer 1 added product', description: 'Customer 1 added product', date: 'Just now' },
-        { type: '1 order purchased customer1', description: '1 order purchased customer1', date: '2 hours ago' },
-        { type: 'pending customer payment of your wooden chair', description: 'pending customer payment of your wooden chair', date: '1 day ago' }
-      ];
+      // Fetch vendor orders to generate activities
+      const response = await axiosInstance.get('/Order/vendor/orders');
       
-      setRecentActivities(mockActivities);
+      const ordersData = response.data.orders || response.data || [];
+      
+      if (!Array.isArray(ordersData) || ordersData.length === 0) {
+        console.log('ℹ️ No orders found for activities');
+        setRecentActivities(getDefaultActivities());
+        return;
+      }
+
+      // Generate activities from orders
+      const activities = [];
+      
+      ordersData.forEach(order => {
+        const orderId = order.orderId || order.OrderId || order.id;
+        const customerName = order.customerName || order.CustomerName || 'Customer';
+        const totalAmount = order.totalAmount || order.TotalAmount || 0;
+        const status = (order.status || order.Status || 'pending').toLowerCase();
+        const orderDate = order.orderDate || order.OrderDate || order.createdOn || order.CreatedOn;
+
+        let activityType = 'info';
+        let activityDescription = '';
+
+        switch (status) {
+          case 'pending':
+          case 'confirmed':
+            activityType = 'order_pending';
+            activityDescription = `${customerName} placed order ${orderId} worth ₹${totalAmount.toLocaleString('en-IN')}`;
+            break;
+
+          case 'shipped':
+          case 'in-transit':
+            activityType = 'order_shipped';
+            activityDescription = `Order ${orderId} shipped to ${customerName}`;
+            break;
+
+          case 'delivered':
+          case 'completed':
+            activityType = 'order_completed';
+            activityDescription = `${customerName} received order ${orderId} (₹${totalAmount.toLocaleString('en-IN')})`;
+            break;
+
+          case 'cancelled':
+            activityType = 'order_cancelled';
+            activityDescription = `Order ${orderId} was cancelled by ${customerName}`;
+            break;
+
+          default:
+            activityType = 'info';
+            activityDescription = `Order ${orderId} - ${customerName}`;
+        }
+
+        activities.push({
+          id: `${orderId}-${status}-${Date.now()}`,
+          type: activityType,
+          description: activityDescription,
+          date: formatActivityDate(orderDate),
+          orderId: orderId,
+          customerName: customerName,
+          amount: totalAmount,
+          status: status,
+          rawDate: orderDate
+        });
+      });
+
+      // Sort by raw date (most recent first)
+      const sortedActivities = activities.sort((a, b) => {
+        return new Date(b.rawDate) - new Date(a.rawDate);
+      });
+
+      // Limit to 10 most recent
+      const limitedActivities = sortedActivities.slice(0, 10);
+
+      setRecentActivities(limitedActivities);
+      
+      console.log('✅ Recent Activities Generated:', limitedActivities.length);
+      
     } catch (error) {
-      console.error('Error loading recent activities:', error);
+      console.error('❌ Error fetching recent activities:', error);
       setRecentActivities(getDefaultActivities());
     }
   }, []);
@@ -124,12 +193,11 @@ export const useDashboardData = (navigate) => {
       const userObj = JSON.parse(user);
       setUserData(userObj);
 
-      // Fetch all data including real notifications
       await Promise.all([
         fetchVendorData(),
         fetchFinancialData(),
         fetchRecentActivities(),
-        fetchNotifications() // Add this to fetch real notifications
+        fetchNotifications()
       ]);
 
     } catch (error) {
@@ -147,10 +215,38 @@ export const useDashboardData = (navigate) => {
     recentActivities,
     isLoading,
     messageThreads,
-    notifications, // Now this returns real notifications from API
+    notifications,
     fetchDashboardData,
-    refreshNotifications: fetchNotifications // Add this for manual refresh
+    refreshNotifications: fetchNotifications,
+    refreshActivities: fetchRecentActivities
   };
+};
+
+// Helper function to format date for activities
+const formatActivityDate = (dateString) => {
+  if (!dateString) return 'Just now';
+  
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    
+    return date.toLocaleDateString('en-IN', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  } catch {
+    return 'Just now';
+  }
 };
 
 const getDefaultFinancialData = (subtitle = 'No data available') => [
@@ -161,5 +257,9 @@ const getDefaultFinancialData = (subtitle = 'No data available') => [
 ];
 
 const getDefaultActivities = () => [
-  { type: 'Welcome to Dealsy!', description: 'Start by adding your products and services', date: 'Just now' }
+  { 
+    type: 'welcome', 
+    description: 'Welcome to Dealsy! Start by adding your products and services', 
+    date: 'Just now' 
+  }
 ];

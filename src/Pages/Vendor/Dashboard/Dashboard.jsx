@@ -35,7 +35,8 @@ const Dashboard = () => {
     isLoading,
     messageThreads,
     notifications: dashboardNotifications,
-    fetchDashboardData
+    fetchDashboardData,
+    refreshActivities
   } = useDashboardData(navigate);
 
   // Profile hook
@@ -68,7 +69,6 @@ const Dashboard = () => {
     if (location.state?.openProfileModal) {
       console.log('✅ Opening profile modal from navigation state');
       setShowProfile(true);
-      // Clear the state to prevent reopening on refresh
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location, navigate]);
@@ -249,6 +249,7 @@ const Dashboard = () => {
           refreshNotifications={handleRefreshNotifications}
           unreadCount={unreadCount}
           isConnected={isConnected}
+          isLoading={false}
         />
       </div>
     </div>

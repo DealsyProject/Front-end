@@ -253,7 +253,7 @@ const ProfileViewPage = () => {
                       <div className="flex items-center gap-3">
                         <Users className="w-5 h-5 text-white" />
                         <div>
-                          <div className="font-medium text-white">Contact Person</div>
+                          <div className="font-medium text-white">Company Owner</div>
                           <div className="text-white">{contactInfo.CompanyOwnerName}</div>
                         </div>
                       </div>

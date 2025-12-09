@@ -25,6 +25,7 @@ const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   // Server response data
   const [products, setProducts] = useState([]);
@@ -32,19 +33,11 @@ const Products = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-
-  const categories = [
-    { id: 'all', name: 'All Products' },
-    { id: 'Grocery', name: 'Grocery' },
-    { id: 'Furniture', name: 'Furniture' },
-    { id: 'Books', name: 'Books' },
-    { id: 'Home Appliance', name: 'Home Appliance' },
-    { id: 'Cloth', name: 'Cloth' },
-  ];
 
   const [newProduct, setNewProduct] = useState({
     productName: '',
@@ -79,6 +72,30 @@ const Products = () => {
     },
     [handleLogout]
   );
+
+  const fetchCategories = useCallback(async () => {
+  try {
+    setCategoriesLoading(true);
+    const response = await axiosInstance.get('/Category');
+    
+    // Correct: Extract from "Categories" (capital C), then map to .Name
+    const categoryNames = (response.data.Categories || [])
+      .map(cat => cat.Name)
+      .sort(); // Optional: sort alphabetically
+
+    setCategories(categoryNames);
+
+    if (categoryNames.length === 0) {
+      toast.info('No categories found. Ask admin to create some.');
+    }
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    toast.error('Failed to load categories');
+    setCategories([]);
+  } finally {
+    setCategoriesLoading(false);
+  }
+}, []);
 
   // Normalize incoming PascalCase → camelCase
   const normalizeProductData = (product) => {
@@ -124,9 +141,8 @@ const Products = () => {
         `/Product/my-products/paginated?${params.toString()}`
       );
 
-      const data = response.data; // PaginatedProductResponseDto
+      const data = response.data;
 
-      // FIX: Handle both PascalCase and camelCase response properties
       const productsArray = data.Products || data.products || [];
       const normalized = productsArray.map(normalizeProductData);
 
@@ -149,6 +165,11 @@ const Products = () => {
       isFetchingRef.current = false;
     }
   }, [currentPage, activeCategory, searchTerm, handleApiError]);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   // Trigger fetch when page/category/search changes
   useEffect(() => {
@@ -180,7 +201,6 @@ const Products = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Add / Update / Delete handlers remain the same
   const handleAddProduct = () => {
     setNewProduct({
       productName: '',
@@ -205,7 +225,7 @@ const Products = () => {
       price: product.price || 0,
       quantity: product.quantity || 1,
       productCategory: product.productCategory || '',
-      images: existingImageUrls, // keep old URLs (backend handles deletion separately if needed)
+      images: existingImageUrls,
       rating: product.rating || 0,
     });
     setShowUpdateModal(true);
@@ -244,7 +264,7 @@ const Products = () => {
 
       toast.success('Product added successfully!');
       setShowAddModal(false);
-      setCurrentPage(1); // go back to first page
+      setCurrentPage(1);
       fetchProducts();
     } catch (error) {
       handleApiError(error, 'Failed to add product');
@@ -268,7 +288,6 @@ const Products = () => {
       formData.append('productCategory', newProduct.productCategory.trim());
       formData.append('rating', parseFloat(newProduct.rating) || 0);
 
-      // Only append new files (strings = old URLs, File = new)
       newProduct.images.forEach((img) => {
         if (img instanceof File) formData.append('images', img);
       });
@@ -355,7 +374,6 @@ const Products = () => {
     </div>
   );
 
-  // Pagination UI helpers
   const getPageNumbers = () => {
     const pages = [];
     const max = 5;
@@ -485,7 +503,9 @@ const Products = () => {
           </div>
           <button
             onClick={handleAddProduct}
-            className="bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition flex items-center space-x-2 font-medium"
+            disabled={categories.length === 0}
+            className={`${categories.length === 0 ? 'opacity-50 cursor-not-allowed' : ''} bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition flex items-center space-x-2 font-medium`}
+            title={categories.length === 0 ? 'Please create categories first' : ''}
           >
             <span className="text-lg">+</span>
             <span>Add Product</span>
@@ -513,21 +533,42 @@ const Products = () => {
         </div>
 
         {/* Category Filters */}
-        <div className="flex gap-4 mb-8 flex-wrap">
-          {categories.map((cat) => (
+        {categoriesLoading ? (
+          <div className="mb-8 text-center py-4">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-4 border-[#586330]"></div>
+            <p className="mt-2 text-gray-600">Loading categories...</p>
+          </div>
+        ) : categories.length > 0 ? (
+          <div className="flex gap-4 mb-8 flex-wrap">
             <button
-              key={cat.id}
-              onClick={() => handleCategoryFilter(cat.id)}
+              onClick={() => handleCategoryFilter('all')}
               className={`px-4 py-2 rounded-lg font-medium transition ${
-                activeCategory === cat.id
+                activeCategory === 'all'
                   ? 'bg-[#586330] text-white'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
               }`}
             >
-              {cat.name}
+              All Products
             </button>
-          ))}
-        </div>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => handleCategoryFilter(cat)}
+                className={`px-4 py-2 rounded-lg font-medium transition ${
+                  activeCategory === cat
+                    ? 'bg-[#586330] text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-yellow-800">No categories available. Please create some categories first before adding products.</p>
+          </div>
+        )}
 
         {/* Loading */}
         {loading && (
@@ -568,17 +609,10 @@ const Products = () => {
               {searchTerm
                 ? 'Try different keywords'
                 : activeCategory !== 'all'
-                ? `No items in "${categories.find((c) => c.id === activeCategory)?.name}"`
+                ? `No items in "${activeCategory}"`
                 : 'Start by adding your first product'}
             </p>
-            {totalCount === 0 && (
-              <button
-                onClick={handleAddProduct}
-                className="mt-6 bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80"
-              >
-                Add Your First Product
-              </button>
-            )}
+           
           </div>
         )}
 
@@ -626,7 +660,7 @@ const Products = () => {
             }}
             handleImageUpload={handleImageUpload}
             handleRemoveImage={handleRemoveImage}
-            categories={categories.filter((c) => c.id !== 'all')}
+            categories={categories}
             isSaving={saving}
           />
         )}
@@ -644,7 +678,7 @@ const Products = () => {
             }}
             handleImageUpload={handleImageUpload}
             handleRemoveImage={handleRemoveImage}
-            categories={categories.filter((c) => c.id !== 'all')}
+            categories={categories}
             isSaving={saving}
             editingProduct={editingProduct}
           />

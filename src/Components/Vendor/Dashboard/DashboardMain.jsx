@@ -7,9 +7,7 @@ const DashboardMain = ({
   activeView,
   financialData,
   recentActivities,
-  setShowMessages,
   setShowNotifications,
-  messageThreads,
   notifications,
   outOfStockNotifications,
   isLoading

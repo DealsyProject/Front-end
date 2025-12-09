@@ -6,15 +6,10 @@ import { AlertTriangle } from 'lucide-react';
 
 const DashboardHeader = ({
   activeView,
-  setShowMessages,
   setShowNotifications,
   showProfile,
   setShowProfile,
-  handleLogout,
-  messageThreads,
-  notifications,
-  userData,
-  vendorData,
+  notifications, 
   profileForm,
   profilePreview,
   isProfileCreated,

@@ -753,14 +753,7 @@ const Products = () => {
                 ? `No items in "${activeCategory}" category`
                 : 'Start by adding your first product'}
             </p>
-            {availableCategories.length > 0 && (
-              <button
-                onClick={handleAddProduct}
-                className="mt-6 bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition font-medium"
-              >
-                Add Your First Product
-              </button>
-            )}
+            
           </div>
         )}
 

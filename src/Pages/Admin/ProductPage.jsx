@@ -282,7 +282,7 @@ const AddCategoryModal = ({ isOpen, onClose, onAddCategory, editingCategory, onU
     if (window.confirm(`Are you sure you want to delete the category "${editingCategory.name}"? This action cannot be undone.`)) {
       setIsLoading(true);
       try {
-        await onDeleteCategory(editingCategory.id);
+        await onDeleteCategory(editingCategory.name);
         onClose();
       } catch (error) {
         console.error('Error deleting category:', error);
@@ -382,16 +382,12 @@ const AddCategoryModal = ({ isOpen, onClose, onAddCategory, editingCategory, onU
   );
 };
 
-// Category List Component
+// Category List Component - Fixed with safe access
 const CategoryList = ({ categories, onEditCategory, onDeleteCategory, products }) => {
-  // Calculate product count for each category
-  const getProductCount = (categoryName) => {
-    if (categoryName === 'All') return products.length;
-    return products.filter(product => product.ProductCategory === categoryName).length;
-  };
-
-  // Filter out 'All' from categories for display
-  const displayCategories = categories.filter(cat => cat !== 'All');
+  // Filter out 'All' and undefined/null categories for display
+  const displayCategories = categories.filter(cat => 
+    cat !== 'All' && cat != null && (typeof cat === 'string' || (typeof cat === 'object' && cat.name))
+  );
 
   if (displayCategories.length === 0) {
     return (
@@ -404,13 +400,36 @@ const CategoryList = ({ categories, onEditCategory, onDeleteCategory, products }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {displayCategories.map((category) => {
-        const productCount = getProductCount(category);
+      {displayCategories.map((category, index) => {
+        // Safely extract category name
+        let categoryName = '';
+        let categoryId = null;
+        
+        if (typeof category === 'object' && category && category.name) {
+          categoryName = category.name;
+          categoryId = category.id || null;
+        } else if (typeof category === 'string' && category) {
+          categoryName = category;
+        } else {
+          // Skip invalid categories
+          console.warn('Invalid category found:', category);
+          return null;
+        }
+        
+        // Ensure categoryName is a valid string
+        if (!categoryName || typeof categoryName !== 'string') {
+          console.warn('Invalid category name:', categoryName);
+          return null;
+        }
+        
+        const productCount = products.filter(product => 
+          product.ProductCategory === categoryName
+        ).length;
         const isCategoryEmpty = productCount === 0;
         
         return (
           <div 
-            key={category} 
+            key={categoryName || `category-${index}`} 
             className={`bg-white rounded-lg border ${isCategoryEmpty ? 'border-gray-300' : 'border-[#a5ad8b]'} shadow-sm hover:shadow-md transition-shadow p-4`}
           >
             <div className="flex items-start justify-between">
@@ -419,7 +438,9 @@ const CategoryList = ({ categories, onEditCategory, onDeleteCategory, products }
                   <Tag className={`w-5 h-5 ${isCategoryEmpty ? 'text-gray-500' : 'text-[#586330]'}`} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 capitalize">{category.toLowerCase()}</h3>
+                  <h3 className="font-semibold text-gray-900 capitalize">
+                    {categoryName.toLowerCase()}
+                  </h3>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`text-xs px-2 py-1 rounded-full ${isCategoryEmpty ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-700'}`}>
                       {productCount} {productCount === 1 ? 'product' : 'products'}
@@ -435,7 +456,7 @@ const CategoryList = ({ categories, onEditCategory, onDeleteCategory, products }
               
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => onEditCategory(category)}
+                  onClick={() => onEditCategory(categoryName)}
                   className="p-1.5 text-gray-500 hover:text-[#586330] transition-colors rounded hover:bg-gray-100"
                   title="Edit Category"
                 >
@@ -444,10 +465,11 @@ const CategoryList = ({ categories, onEditCategory, onDeleteCategory, products }
                 <button
                   onClick={() => {
                     if (productCount > 0) {
-                      toast.warning(`Cannot delete category "${category}" because it has ${productCount} products.`);
+                      toast.warning(`Cannot delete category "${categoryName}" because it has ${productCount} products.`);
                     } else {
-                      if (window.confirm(`Delete category "${category}"?`)) {
-                        onDeleteCategory(category);
+                      if (window.confirm(`Delete category "${categoryName}"?`)) {
+                        // Pass both name and id if available
+                        onDeleteCategory(categoryName, categoryId);
                       }
                     }
                   }}
@@ -470,7 +492,7 @@ const CategoryList = ({ categories, onEditCategory, onDeleteCategory, products }
                 <p className="text-xs text-gray-500 mb-2">Recent products in this category:</p>
                 <div className="space-y-1">
                   {products
-                    .filter(product => product.ProductCategory === category)
+                    .filter(product => product.ProductCategory === categoryName)
                     .slice(0, 3)
                     .map(product => (
                       <div key={product.Id} className="flex items-center justify-between text-sm">
@@ -531,25 +553,34 @@ export default function ProductsPage() {
     }
   };
 
-  const fetchCategories = async () => {
+ // Fetch categories from API
+const fetchCategories = async () => {
   try {
     setCategoryLoading(true);
-    // Correct endpoint based on your controller
-    const response = await axiosInstance.get('/Category'); // ← Fixed URL
+    const response = await axiosInstance.get('/Category');
     
-    // The response has { Categories: [{ Id, Name }] }
+    // Store category objects with id and name
     const categoriesList = response.data.Categories || [];
     
-    // Extract just the names as strings
-    const categoryNames = categoriesList.map(cat => cat.Name);
+    // Filter out invalid categories and store as objects
+    const categoryObjects = categoriesList
+      .filter(cat => cat && cat.Name && cat.Id) // Only valid categories
+      .map(cat => ({
+        id: cat.Id,
+        name: cat.Name
+      }));
     
-    setCategories(['All', ...categoryNames]);
+    // Keep 'All' as a string, others as objects
+    setCategories(['All', ...categoryObjects]);
   } catch (err) {
     console.error('Error fetching categories:', err);
     toast.error('Failed to load categories');
     
-    // Fallback: extract from products
-    const productCategories = [...new Set(products.map(p => p.ProductCategory).filter(Boolean))];
+    // Fallback: extract from products as strings, filter out undefined/null
+    const productCategories = [...new Set(products
+      .map(p => p.ProductCategory)
+      .filter(Boolean) // Remove null/undefined
+    )];
     setCategories(['All', ...productCategories]);
   } finally {
     setCategoryLoading(false);
@@ -577,15 +608,28 @@ export default function ProductsPage() {
     setSelectedProduct(null);
   };
 
-  // Open category modal
-  const openCategoryModal = (category = null) => {
-    if (typeof category === 'string' && category !== 'All') {
-      setEditingCategory({
-        id: category,
-        name: category
-      });
+  // Open category modal - improved to handle object categories
+  const openCategoryModal = (categoryName = null) => {
+    if (categoryName && typeof categoryName === 'string' && categoryName !== 'All') {
+      // We need to find the full category object to get the ID
+      const categoryFromList = categories.find(cat => 
+        typeof cat === 'object' ? cat.name === categoryName : cat === categoryName
+      );
+      
+      if (typeof categoryFromList === 'object') {
+        setEditingCategory({
+          id: categoryFromList.id,
+          name: categoryFromList.name
+        });
+      } else {
+        // For now, just set the name - we'll fetch the ID when updating
+        setEditingCategory({
+          id: categoryName, // This will be treated as name
+          name: categoryName
+        });
+      }
     } else {
-      setEditingCategory(category);
+      setEditingCategory(null);
     }
     setIsCategoryModalOpen(true);
   };
@@ -604,16 +648,14 @@ export default function ProductsPage() {
         name: categoryData.name
       });
       
-      const newCategory = response.data.category || {
-        id: Date.now().toString(),
-        name: categoryData.name,
-        productCount: 0
-      };
-
+      const newCategory = response.data;
+      
       // Update categories list
       setCategories(prev => {
-        const filtered = prev.filter(cat => cat !== 'All' && cat !== newCategory.name);
-        return ['All', newCategory.name, ...filtered];
+        const filtered = prev.filter(cat => 
+          cat === 'All' || (typeof cat === 'object' && cat.name !== newCategory.name)
+        );
+        return ['All', { id: newCategory.id, name: newCategory.name }, ...filtered.filter(c => c !== 'All')];
       });
 
       toast.success(`Category "${newCategory.name}" added successfully`);
@@ -623,7 +665,8 @@ export default function ProductsPage() {
       
     } catch (err) {
       console.error('Error adding category:', err);
-      toast.error(err.response?.data?.message || 'Failed to add category');
+      const errorMessage = err.response?.data?.message || err.response?.data?.errors?.[0]?.ErrorMessage || 'Failed to add category';
+      toast.error(errorMessage);
       throw err;
     }
   };
@@ -631,18 +674,43 @@ export default function ProductsPage() {
   // Update existing category
   const handleUpdateCategory = async (categoryData) => {
     try {
-      // API call to update category
-      await axiosInstance.put(`/Category/${categoryData.id}`, {
-        name: categoryData.name
+      // First, we need to get the category ID by name
+      let categoryId = categoryData.id;
+      
+      // If categoryData.id is actually a name (string), we need to find the ID
+      if (isNaN(categoryData.id)) {
+        try {
+          // Fetch category by name to get the ID
+          const response = await axiosInstance.get(`/Category/by-name/${encodeURIComponent(categoryData.id)}`);
+          categoryId = response.data.id;
+        } catch (err) {
+          console.error('Error fetching category ID:', err);
+          toast.error('Could not find category to update');
+          throw err;
+        }
+      }
+      
+      // API call to update category with ID
+      await axiosInstance.put(`/Category/${categoryId}`, {
+        name: categoryData.name,
+        id: categoryId
       });
       
       toast.success(`Category "${categoryData.name}" updated successfully`);
       
       // Update categories list
       setCategories(prev => {
-        const updated = prev.map(cat => 
-          cat === editingCategory.name ? categoryData.name : cat
-        );
+        const oldName = editingCategory.name;
+        const updated = prev.map(cat => {
+          if (cat === 'All') return 'All';
+          if (typeof cat === 'object' && cat.name === oldName) {
+            return { ...cat, name: categoryData.name };
+          }
+          if (cat === oldName) {
+            return { id: categoryId, name: categoryData.name };
+          }
+          return cat;
+        });
         return updated;
       });
 
@@ -655,38 +723,68 @@ export default function ProductsPage() {
         )
       );
       
+      // Refresh categories from server
+      await fetchCategories();
+      
     } catch (err) {
       console.error('Error updating category:', err);
-      toast.error(err.response?.data?.message || 'Failed to update category');
+      const errorMessage = err.response?.data?.message || err.response?.data?.errors?.[0]?.ErrorMessage || 'Failed to update category';
+      toast.error(errorMessage);
       throw err;
     }
   };
 
-  // Delete category
-  const handleDeleteCategory = async (categoryName) => {
-    try {
-      // First check if category has products
-      const productCount = products.filter(p => p.ProductCategory === categoryName).length;
-      if (productCount > 0) {
-        toast.error(`Cannot delete category "${categoryName}" because it has ${productCount} products.`);
+  // Delete category - Updated to accept optional id parameter
+const handleDeleteCategory = async (categoryName, categoryId = null) => {
+  try {
+    // First check if category has products
+    const productCount = products.filter(p => p.ProductCategory === categoryName).length;
+    if (productCount > 0) {
+      toast.error(`Cannot delete category "${categoryName}" because it has ${productCount} products.`);
+      return;
+    }
+
+    let idToDelete = categoryId;
+    
+    // If no ID provided, get category ID by name
+    if (!idToDelete) {
+      try {
+        const response = await axiosInstance.get(`/Category/by-name/${encodeURIComponent(categoryName)}`);
+        idToDelete = response.data.id;
+      } catch (err) {
+        console.error('Error fetching category ID:', err);
+        toast.error('Could not find category to delete');
         return;
       }
-
-      // API call to delete category (you'll need to get the category ID first)
-      // For now, simulate deletion
-      // await axiosInstance.delete(`/Product/categories/${categoryId}`);
-      
-      // Update categories list
-      setCategories(prev => prev.filter(cat => cat !== categoryName));
-      
-      toast.success(`Category "${categoryName}" deleted successfully`);
-      
-    } catch (err) {
-      console.error('Error deleting category:', err);
-      toast.error(err.response?.data?.message || 'Failed to delete category');
-      throw err;
     }
-  };
+
+    if (!idToDelete) {
+      toast.error('Category ID not found');
+      return;
+    }
+
+    // API call to delete category by ID
+    await axiosInstance.delete(`/Category/${idToDelete}`);
+    
+    // Update categories list
+    setCategories(prev => prev.filter(cat => {
+      if (cat === 'All') return true;
+      if (typeof cat === 'object') return cat.name !== categoryName;
+      return cat !== categoryName;
+    }));
+    
+    toast.success(`Category "${categoryName}" deleted successfully`);
+    
+    // Refresh categories from server
+    await fetchCategories();
+    
+  } catch (err) {
+    console.error('Error deleting category:', err);
+    const errorMessage = err.response?.data?.message || err.response?.data?.errors?.[0]?.ErrorMessage || 'Failed to delete category';
+    toast.error(errorMessage);
+    throw err;
+  }
+};
 
   // Send out-of-stock notification to vendor
   const sendOutOfStockNotification = async (product) => {
@@ -1043,11 +1141,17 @@ export default function ProductsPage() {
               {categoryLoading ? (
                 <option>Loading categories...</option>
               ) : (
-                categories.map(category => (
-                  <option key={category} value={category}>
-                    {typeof category === 'object' ? category.name : category}
-                  </option>
-                ))
+                categories.map(category => {
+                  if (category === 'All') {
+                    return <option key="All" value="All">All Categories</option>;
+                  }
+                  return (
+                    <option key={typeof category === 'object' ? category.id : category} 
+                            value={typeof category === 'object' ? category.name : category}>
+                      {typeof category === 'object' ? category.name : category}
+                    </option>
+                  );
+                })
               )}
             </select>
           </div>
@@ -1177,11 +1281,11 @@ export default function ProductsPage() {
             </div>
             
             <CategoryList 
-              categories={categories}
-              onEditCategory={openCategoryModal}
-              onDeleteCategory={handleDeleteCategory}
-              products={products}
-            />
+  categories={categories}
+  onEditCategory={openCategoryModal}
+  onDeleteCategory={handleDeleteCategory}
+  products={products}
+/>
             
             <div className="mt-6 pt-6 border-t border-gray-200 text-center">
               <p className="text-sm text-gray-500">

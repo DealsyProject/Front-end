@@ -1,3 +1,4 @@
+// Dashboard.jsx - Updated to pass categories to header
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -42,6 +43,9 @@ const Dashboard = () => {
     profilePreview,
     isProfileCreated,
     isUpdating,
+    isProfileLoading,
+    categories,
+    isCategoriesLoading,
     handleInputChange,
     handleProfileSave,
     handleProfileCancel,
@@ -210,6 +214,9 @@ const Dashboard = () => {
           profilePreview={profilePreview}
           isProfileCreated={isProfileCreated}
           isUpdating={isUpdating}
+          isProfileLoading={isProfileLoading}
+          categories={categories}
+          isCategoriesLoading={isCategoriesLoading}
           handleInputChange={handleInputChange}
           handleProfileSave={handleProfileSave}
           handleProfileCancel={handleProfileCancel}
@@ -243,4 +250,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-

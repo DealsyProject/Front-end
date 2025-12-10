@@ -14,6 +14,9 @@ const DashboardHeader = ({
   profilePreview,
   isProfileCreated,
   isUpdating,
+  isProfileLoading,
+  categories,
+  isCategoriesLoading,
   handleInputChange,
   handleProfileSave,
   handleProfileCancel,
@@ -21,7 +24,7 @@ const DashboardHeader = ({
   handleRemoveProfileImage,
   profileInputRef,
   handleBackdropClick,
-  onProfileNavigate // Add this prop to handle navigation
+  onProfileNavigate
 }) => {
   // Count out-of-stock notifications
   const outOfStockCount = notifications?.filter(n => n.isOutOfStock && n.status === 'New')?.length || 0;
@@ -51,6 +54,7 @@ const DashboardHeader = ({
         <ProfileButton 
           isProfileCreated={isProfileCreated}
           onClick={handleProfileButtonClick}
+          isLoading={isProfileLoading}
         />
 
         {/* Notification Button */}
@@ -90,6 +94,8 @@ const DashboardHeader = ({
           handleProfileSave={handleProfileSave}
           handleBackdropClick={handleBackdropClick}
           isUpdating={isUpdating}
+          categories={categories}
+          isCategoriesLoading={isCategoriesLoading}
         />
       )}
     </header>

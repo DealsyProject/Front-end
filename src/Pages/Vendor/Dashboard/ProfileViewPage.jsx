@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Briefcase, Star, MapPin, Phone, Mail, Globe, Clock, Award, Users, Truck, Shield, Building } from 'lucide-react';
+import { ArrowLeft, Edit, Briefcase, Star, MapPin, Phone, Mail, Globe, Clock, Award, Users, Truck, Shield, Building, Package, TrendingUp, DollarSign, CheckCircle } from 'lucide-react';
 import axiosInstance from '../../../Components/utils/axiosInstance';
 import { toast } from 'react-toastify';
 
@@ -9,10 +9,16 @@ const ProfileViewPage = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    customerRating: 0,
+    customerRating: 4.8,
     ordersCompleted: 0,
     activeProducts: 0,
     totalRevenue: 0
+  });
+  const [vendorStats, setVendorStats] = useState({
+    totalOrders: 0,
+    totalRevenue: 0,
+    totalProducts: 0,
+    totalCustomers: 0
   });
 
   useEffect(() => {
@@ -29,7 +35,7 @@ const ProfileViewPage = () => {
           setProfile(profileData);
           
           // Fetch vendor stats
-          await fetchVendorStats();
+          await fetchVendorStats(profileData.VendorName || '');
         } else {
           console.log('⚠️ No profile data found');
           toast.error('Profile not found. Please create your profile first.');
@@ -50,7 +56,32 @@ const ProfileViewPage = () => {
       }
     };
 
-  
+    const fetchVendorStats = async (vendorName) => {
+      try {
+        console.log('📊 Fetching vendor stats...');
+        // Note: You'll need to implement these API endpoints in your backend
+        // For now, using placeholder data
+        const statsResponse = await axiosInstance.get('/vendor/stats');
+        
+        if (statsResponse.data) {
+          setVendorStats({
+            totalOrders: statsResponse.data.totalOrders || 0,
+            totalRevenue: statsResponse.data.totalRevenue || 0,
+            totalProducts: statsResponse.data.totalProducts || 0,
+            totalCustomers: statsResponse.data.totalCustomers || 0
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error fetching vendor stats:', error);
+        // Use default stats
+        setVendorStats({
+          totalOrders: 0,
+          totalRevenue: 0,
+          totalProducts: 0,
+          totalCustomers: 0
+        });
+      }
+    };
 
     fetchProfile();
   }, [navigate]);
@@ -67,8 +98,39 @@ const ProfileViewPage = () => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(amount);
+  };
+
+  // Helper function to format numbers with commas
+  const formatNumber = (num) => {
+    return new Intl.NumberFormat('en-US').format(num);
+  };
+
+  // Get business type display text
+  const getBusinessTypeDisplay = (businessType) => {
+    if (businessType === 'All') {
+      return 'Multiple Categories';
+    }
+    return businessType;
+  };
+
+  // Get business description placeholder based on business type
+  const getBusinessDescriptionPlaceholder = (businessType) => {
+    if (businessType === 'All') {
+      return "We offer a wide range of products across multiple categories, providing customers with a one-stop shopping experience. Our commitment to quality and customer satisfaction spans all our product lines.";
+    }
+    return "We are a premium provider of quality products with a commitment to customer satisfaction and sustainable business practices.";
+  };
+
+  // Get about section placeholder based on business type
+  const getAboutPlaceholder = (businessType, vendorName) => {
+    if (businessType === 'All') {
+      return `Welcome to ${vendorName}, your trusted partner for a diverse range of quality products across multiple categories. With over a decade of experience in the industry, we have built a reputation for excellence, reliability, and outstanding customer service across all product lines.`;
+    }
+    return `Welcome to ${vendorName}, your trusted partner for premium quality products. With over a decade of experience in the ${businessType} industry, we have built a reputation for excellence, reliability, and outstanding customer service.`;
   };
 
   if (loading) {
@@ -99,6 +161,7 @@ const ProfileViewPage = () => {
   }
 
   const contactInfo = profile.ContactInfo || {};
+  const businessTypeDisplay = getBusinessTypeDisplay(profile.BusinessType);
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -113,7 +176,6 @@ const ProfileViewPage = () => {
             <span>Back to Dashboard</span>
           </button>
           <div className="flex items-center gap-4">
-            
             <button
               onClick={handleEdit}
               className="flex items-center gap-2 px-4 py-2 bg-[#586330] text-white rounded-lg hover:bg-[#4a5428] transition-colors"
@@ -127,6 +189,9 @@ const ProfileViewPage = () => {
 
       {/* Profile Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Stats Overview */}
+       
+
         {/* Profile Card */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden mb-8">
           {/* Cover Banner */}
@@ -169,7 +234,6 @@ const ProfileViewPage = () => {
               )}
             </div>
 
-           
             {/* Name and Business Type */}
             <div className="mb-8">
               <h1 className="text-4xl font-bold text-gray-900 mb-2">
@@ -179,8 +243,13 @@ const ProfileViewPage = () => {
                 <div className="flex items-center gap-2 text-gray-600">
                   <Briefcase className="w-5 h-5" />
                   <span className="text-lg capitalize">
-                    {profile.BusinessType}
+                    {businessTypeDisplay}
                   </span>
+                  {profile.BusinessType === 'All' && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                      General Store
+                    </span>
+                  )}
                 </div>
                 {contactInfo.CompanyName && (
                   <div className="flex items-center gap-2 text-gray-600">
@@ -188,7 +257,12 @@ const ProfileViewPage = () => {
                     <span className="text-lg">{contactInfo.CompanyName}</span>
                   </div>
                 )}
-                
+                {/* Rating Display */}
+                <div className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                  <span className="font-semibold">{stats.customerRating}</span>
+                  <span className="text-gray-500">({formatNumber(vendorStats.totalCustomers)} reviews)</span>
+                </div>
               </div>
             </div>
 
@@ -196,11 +270,11 @@ const ProfileViewPage = () => {
             <div className="mb-10">
               <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <Briefcase className="w-6 h-6" />
-                Business Description
+                {profile.BusinessType === 'All' ? 'Business Overview' : 'Business Description'}
               </h2>
               <div className="bg-gray-50 rounded-xl p-6">
                 <p className="text-gray-600 leading-relaxed text-lg">
-                  {profile.Description || "We are a premium provider of quality products with a commitment to customer satisfaction and sustainable business practices."}
+                  {profile.Description || getBusinessDescriptionPlaceholder(profile.BusinessType)}
                 </p>
               </div>
             </div>
@@ -209,15 +283,15 @@ const ProfileViewPage = () => {
             <div className="mb-10">
               <h2 className="text-2xl font-semibold text-gray-800 mb-4">Our Story</h2>
               <p className="text-gray-600 leading-relaxed whitespace-pre-wrap text-lg">
-                {profile.About || `Welcome to ${profile.VendorName}, your trusted partner for premium quality products. With over a decade of experience in the industry, we have built a reputation for excellence, reliability, and outstanding customer service.`}
+                {profile.About || getAboutPlaceholder(profile.BusinessType, profile.VendorName)}
               </p>
             </div>
 
             {/* Contact Information */}
             <div className="mb-10">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Personal Information</h2>
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Contact Information</h2>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-gradient-to-r from-[#586330] to-[#8a9a5b] rounded-xl shadow-sm  p-6">
+                <div className="bg-gradient-to-r from-[#586330] to-[#8a9a5b] rounded-xl shadow-sm p-6">
                   <div className="space-y-6">
                     {contactInfo.Location && (
                       <div className="flex items-center gap-3">
@@ -253,24 +327,24 @@ const ProfileViewPage = () => {
                       <div className="flex items-center gap-3">
                         <Users className="w-5 h-5 text-white" />
                         <div>
-                          <div className="font-medium text-white">Contact Person</div>
+                          <div className="font-medium text-white">Company Owner</div>
                           <div className="text-white">{contactInfo.CompanyOwnerName}</div>
                         </div>
                       </div>
                     )}
                     
-                    {/* Business Hours (static for now) */}
+                    {/* Business Hours */}
                     <div className="flex items-center gap-3">
                       <Clock className="w-5 h-5 text-white" />
                       <div>
                         <div className="font-medium text-white">Business Hours</div>
-                        <div className="text-white">Mon-Fri: 9AM-6PM </div>
+                        <div className="text-white">Mon-Fri: 9AM-6PM | Sat: 10AM-4PM</div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Certifications & Payment */}
+                {/* Certifications & Features */}
                 <div className="space-y-6">
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                     <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -278,17 +352,40 @@ const ProfileViewPage = () => {
                       Certifications & Badges
                     </h2>
                     <div className="flex flex-wrap gap-2">
-                      {['Verified Seller', 'Quality Certified', 'Eco-Friendly'].map((cert, index) => (
-                        <span key={index} className="px-3 py-2 bg-[#586330]/10 text-[#586330] rounded-lg text-sm font-medium">
-                          {cert}
-                        </span>
-                      ))}
+                      {profile.BusinessType === 'All' ? (
+                        <>
+                          <span className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium">
+                            Multi-Category Verified
+                          </span>
+                          <span className="px-3 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
+                            Quality Certified
+                          </span>
+                          <span className="px-3 py-2 bg-purple-100 text-purple-800 rounded-lg text-sm font-medium">
+                            Trusted Seller
+                          </span>
+                          <span className="px-3 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium">
+                            Fast Shipping
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium">
+                            Verified Seller
+                          </span>
+                          <span className="px-3 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
+                            Quality Certified
+                          </span>
+                          <span className="px-3 py-2 bg-purple-100 text-purple-800 rounded-lg text-sm font-medium">
+                            Eco-Friendly
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  
+                 
 
-                  
+                 
                 </div>
               </div>
             </div>
@@ -296,6 +393,8 @@ const ProfileViewPage = () => {
            
           </div>
         </div>
+
+      
 
       
       </div>

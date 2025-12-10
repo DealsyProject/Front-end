@@ -290,7 +290,7 @@ const Payments = () => {
           <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
             <div className="space-y-4 text-base">
               <div className="flex justify-between">
-                <span className="text-gray-600">Transaction ID</span>
+                <span className="text-gray-600">Payout ID</span>
                 <span className="font-mono font-semibold">{selectedPayment.transactionId}</span>
               </div>
               <div className="flex justify-between">
@@ -298,11 +298,8 @@ const Payments = () => {
                 <span className="font-semibold">{formatDateTime(selectedPayment.date)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Payment Method</span>
-                <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-                  {selectedPayment.method}
-                </span>
-                <span className="px-3">Status:  <PaymentStatusBadge status={selectedPayment.status} /></span>
+                
+                <span className="">Status:  <PaymentStatusBadge status={selectedPayment.status} /></span>
               </div>
             </div>
           </div>
@@ -374,9 +371,7 @@ const Payments = () => {
           <h3 className="text-2xl font-bold text-gray-800 mb-5">My Payout Information</h3>
           <div className="flex items-center gap-4 mt-4">
             <PaymentStatusBadge status={selectedVendorPayment.status} />
-            <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-              {selectedVendorPayment.notes}
-            </span>
+            
           </div>
         </div>
 
@@ -388,20 +383,12 @@ const Payments = () => {
                 <span className="text-gray-600">Payout ID</span>
                 <span className="font-mono font-semibold">{selectedVendorPayment.paymentId}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Transaction ID</span>
-                <span className="font-mono">{selectedVendorPayment.transactionId}</span>
-              </div>
+             
               <div className="flex justify-between">
                 <span className="text-gray-600">Payout Date</span>
                 <span className="font-semibold">{formatDateTime(selectedVendorPayment.date)}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Payment Method</span>
-                <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 capitalize">
-                  {selectedVendorPayment.method}
-                </span>
-              </div>
+             
               <div className="flex justify-between">
                 <span className="text-gray-600">Total Orders</span>
                 <span className="font-semibold">{selectedVendorPayment.totalOrders}</span>
@@ -410,16 +397,13 @@ const Payments = () => {
           </div>
 
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-            <h4 className="text-lg font-bold text-gray-800 mb-4">Bank & Amount Details</h4>
+            <h4 className="text-lg font-bold text-gray-800 mb-4">Amount Details</h4>
             <div className="space-y-4">
-              <div>
-                <p className="text-lg font-semibold text-gray-800">{selectedVendorPayment.bankName}</p>
-                <p className="text-gray-600">Account: {selectedVendorPayment.bankAccount}</p>
-              </div>
+              
               <div className="pt-4 border-t border-blue-200">
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Gross Amount</span>
+                    <span className="text-gray-600">Total Order Amount</span>
                     <span className="font-medium">{formatCurrency(selectedVendorPayment.amount)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -451,9 +435,7 @@ const Payments = () => {
                       <p className="text-sm text-gray-500">Order included in this payout</p>
                     </div>
                   </div>
-                  <button className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
-                    View Order
-                  </button>
+                  
                 </div>
               ))}
             </div>
@@ -598,8 +580,8 @@ const Payments = () => {
                             {filteredOrderPayments.map(payment => (
                               <tr key={payment.paymentId} className="hover:bg-gray-50">
                                 <td className="px-6 py-4">
-                                  <div className="text-sm font-medium text-gray-900">{payment.paymentId}</div>
-                                  <div className="text-xs text-gray-400">TXN: {payment.transactionId}</div>
+                                  <div className="text-sm font-medium text-gray-900">ID: {payment.paymentId}</div>
+                                  
                                   <div className="text-xs text-gray-500 mt-1">{formatDateTime(payment.date)}</div>
                                 </td>
                                 <td className="px-6 py-4">
@@ -692,7 +674,7 @@ const Payments = () => {
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Payout Details</th>
-                              <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Bank Details</th>
+                              
                               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -702,34 +684,21 @@ const Payments = () => {
                             {filteredVendorPayments.map(payment => (
                               <tr key={payment.paymentId} className="hover:bg-gray-50">
                                 <td className="px-6 py-4">
-                                  <div className="text-sm font-medium text-gray-900">{payment.paymentId}</div>
-                                  <div className="text-xs text-gray-400">TXN: {payment.transactionId}</div>
+                                  <div className="text-sm font-medium text-gray-900">ID: {payment.paymentId}</div>
+                                  
                                   <div className="text-xs text-gray-500 mt-1">{formatDateTime(payment.date)}</div>
-                                  <div className="text-xs text-gray-500 mt-1">{payment.notes}</div>
+                                
                                 </td>
-                                <td className="px-6 py-4">
-                                  <div className="text-sm font-medium text-gray-900">{payment.bankName}</div>
-                                  <div className="text-sm text-gray-500">A/C: {payment.bankAccount}</div>
-                                  <div className="text-sm text-gray-500">Method: {payment.method}</div>
-                                </td>
+                               
                                 <td className="px-6 py-4">
                                   <div className="space-y-1">
                                     <div className="text-lg font-bold text-gray-900">{formatCurrency(payment.amount)}</div>
-                                    {payment.commission > 0 && (
-                                      <div className="text-xs text-red-600">
-                                        -{formatCurrency(payment.commission)} commission
-                                      </div>
-                                    )}
-                                    <div className="text-sm text-green-600 font-medium">
-                                      Net: {formatCurrency(payment.netAmount)}
-                                    </div>
+                                   
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
                                   <PaymentStatusBadge status={payment.status} />
-                                  <div className="mt-1 text-xs text-gray-500">
-                                    {payment.totalOrders} orders
-                                  </div>
+                                  
                                 </td>
                                 <td className="px-6 py-4">
                                   <button 

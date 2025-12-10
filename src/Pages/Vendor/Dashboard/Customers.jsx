@@ -349,9 +349,7 @@ const Customers = () => {
                         <div>
                           <strong>Email:</strong> {selectedOrder.email}
                         </div>
-                        <div>
-                          <strong>Customer ID:</strong> {selectedOrder.customerId}
-                        </div>
+                       
                       </div>
                     </div>
                   </div>

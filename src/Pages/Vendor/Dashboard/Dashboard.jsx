@@ -1,10 +1,10 @@
+// Dashboard.jsx - Updated to pass categories to header
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // Import components
-import MessagesModal from '../../../Components/Vendor/Dashboard/modals/MessagesModal';
 import NotificationsModal from '../../../Components/Vendor/Dashboard/modals/NotificationsModal';
 import Sidebar from "../../../Components/Vendor/Dashboard/Sidebar";
 import DashboardHeader from '../../../Components/Vendor/Dashboard/DashboardHeader';
@@ -19,7 +19,6 @@ import { useNotificationHub } from '../../../Components/Vendor/Dashboard/hooks/u
 
 const Dashboard = () => {
   const [activeView, setActiveView] = useState('dashboard');
-  const [showMessages, setShowMessages] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
@@ -33,7 +32,6 @@ const Dashboard = () => {
     financialData,
     recentActivities,
     isLoading,
-    messageThreads,
     notifications: dashboardNotifications,
     fetchDashboardData,
     refreshActivities
@@ -45,6 +43,9 @@ const Dashboard = () => {
     profilePreview,
     isProfileCreated,
     isUpdating,
+    isProfileLoading,
+    categories,
+    isCategoriesLoading,
     handleInputChange,
     handleProfileSave,
     handleProfileCancel,
@@ -176,13 +177,6 @@ const Dashboard = () => {
       <ToastContainer position="top-right" autoClose={3000} />
 
       {/* External Modals */}
-      {showMessages && (
-        <MessagesModal
-          setShowMessages={setShowMessages}
-          messageThreads={messageThreads}
-        />
-      )}
-
       {showNotifications && (
         <NotificationsModal
           setShowNotifications={setShowNotifications}
@@ -209,12 +203,10 @@ const Dashboard = () => {
         {/* Header with Profile Modal */}
         <DashboardHeader
           activeView={activeView}
-          setShowMessages={setShowMessages}
           setShowNotifications={setShowNotifications}
           showProfile={showProfile}
           setShowProfile={setShowProfile}
           handleLogout={handleLogout}
-          messageThreads={messageThreads}
           notifications={allNotifications}
           userData={userData}
           vendorData={vendorData}
@@ -222,6 +214,9 @@ const Dashboard = () => {
           profilePreview={profilePreview}
           isProfileCreated={isProfileCreated}
           isUpdating={isUpdating}
+          isProfileLoading={isProfileLoading}
+          categories={categories}
+          isCategoriesLoading={isCategoriesLoading}
           handleInputChange={handleInputChange}
           handleProfileSave={handleProfileSave}
           handleProfileCancel={handleProfileCancel}
@@ -240,9 +235,7 @@ const Dashboard = () => {
           activeView={activeView}
           financialData={financialData}
           recentActivities={recentActivities}
-          setShowMessages={setShowMessages}
           setShowNotifications={setShowNotifications}
-          messageThreads={messageThreads}
           notifications={allNotifications}
           outOfStockNotifications={outOfStockNotifications}
           otherNotifications={otherNotifications}

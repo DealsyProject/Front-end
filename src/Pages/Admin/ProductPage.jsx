@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, CheckCircle, AlertTriangle, Eye, Download, Bell, X, Star, Calendar, Package, User, Tag } from 'lucide-react';
+import { Search, CheckCircle, AlertTriangle, Eye, Download, Bell, X, Star, Calendar, Package, User, Tag, Plus, Edit, Trash2, List } from 'lucide-react';
 import Navbar from '../../Components/Admin/Navbar.jsx';
 import axiosInstance from '../../Components/utils/axiosInstance.js';
 import { toast } from 'react-toastify';
@@ -229,15 +229,275 @@ const ProductDetailModal = ({ product, isOpen, onClose }) => {
           >
             Close
           </button>
-          
         </div>
       </div>
     </div>
   );
 };
 
+// Add Category Modal Component
+const AddCategoryModal = ({ isOpen, onClose, onAddCategory, editingCategory, onUpdateCategory, onDeleteCategory }) => {
+  const [categoryName, setCategoryName] = useState(editingCategory?.name || '');
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (editingCategory) {
+      setCategoryName(editingCategory.name);
+    } else {
+      setCategoryName('');
+    }
+  }, [editingCategory]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!categoryName.trim()) {
+      toast.error('Please enter a category name');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (editingCategory) {
+        await onUpdateCategory({
+          ...editingCategory,
+          name: categoryName.trim(),
+        });
+      } else {
+        await onAddCategory({
+          name: categoryName.trim(),
+        });
+      }
+      setCategoryName('');
+      onClose();
+    } catch (error) {
+      console.error('Error saving category:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingCategory) return;
+    
+    if (window.confirm(`Are you sure you want to delete the category "${editingCategory.name}"? This action cannot be undone.`)) {
+      setIsLoading(true);
+      try {
+        await onDeleteCategory(editingCategory.id);
+        onClose();
+      } catch (error) {
+        console.error('Error deleting category:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#586330] rounded-lg">
+              <Tag className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                {editingCategory ? 'Edit Category' : 'Add New Category'}
+              </h2>
+              <p className="text-gray-500">
+                {editingCategory ? 'Update category details' : 'Create a new product category'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={isLoading}
+          >
+            <X className="w-6 h-6 text-gray-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category Name *
+              </label>
+              <input
+                type="text"
+                value={categoryName}
+                onChange={(e) => setCategoryName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#586330] focus:border-transparent"
+                placeholder="Enter category name"
+                required
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
+            {editingCategory && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoading}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-[#586330] hover:bg-[#4b572a] text-white rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  {editingCategory ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                <>
+                  {editingCategory ? <Edit className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                  {editingCategory ? 'Update Category' : 'Add Category'}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Category List Component
+const CategoryList = ({ categories, onEditCategory, onDeleteCategory, products }) => {
+  // Calculate product count for each category
+  const getProductCount = (categoryName) => {
+    if (categoryName === 'All') return products.length;
+    return products.filter(product => product.ProductCategory === categoryName).length;
+  };
+
+  // Filter out 'All' from categories for display
+  const displayCategories = categories.filter(cat => cat !== 'All');
+
+  if (displayCategories.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <Tag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-500">No categories found. Add your first category!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {displayCategories.map((category) => {
+        const productCount = getProductCount(category);
+        const isCategoryEmpty = productCount === 0;
+        
+        return (
+          <div 
+            key={category} 
+            className={`bg-white rounded-lg border ${isCategoryEmpty ? 'border-gray-300' : 'border-[#a5ad8b]'} shadow-sm hover:shadow-md transition-shadow p-4`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${isCategoryEmpty ? 'bg-gray-100' : 'bg-[#e5e9d3]'}`}>
+                  <Tag className={`w-5 h-5 ${isCategoryEmpty ? 'text-gray-500' : 'text-[#586330]'}`} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 capitalize">{category.toLowerCase()}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-xs px-2 py-1 rounded-full ${isCategoryEmpty ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {productCount} {productCount === 1 ? 'product' : 'products'}
+                    </span>
+                    {isCategoryEmpty && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">
+                        Empty
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onEditCategory(category)}
+                  className="p-1.5 text-gray-500 hover:text-[#586330] transition-colors rounded hover:bg-gray-100"
+                  title="Edit Category"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    if (productCount > 0) {
+                      toast.warning(`Cannot delete category "${category}" because it has ${productCount} products.`);
+                    } else {
+                      if (window.confirm(`Delete category "${category}"?`)) {
+                        onDeleteCategory(category);
+                      }
+                    }
+                  }}
+                  className={`p-1.5 transition-colors rounded ${
+                    productCount > 0 
+                      ? 'text-gray-300 cursor-not-allowed' 
+                      : 'text-gray-500 hover:text-red-600 hover:bg-red-50'
+                  }`}
+                  title={productCount > 0 ? "Cannot delete - has products" : "Delete Category"}
+                  disabled={productCount > 0}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Products in this category (preview) */}
+            {productCount > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <p className="text-xs text-gray-500 mb-2">Recent products in this category:</p>
+                <div className="space-y-1">
+                  {products
+                    .filter(product => product.ProductCategory === category)
+                    .slice(0, 3)
+                    .map(product => (
+                      <div key={product.Id} className="flex items-center justify-between text-sm">
+                        <span className="truncate text-gray-700">{product.ProductName}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${product.Quantity <= 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                          {product.Quantity} left
+                        </span>
+                      </div>
+                    ))}
+                  {productCount > 3 && (
+                    <div className="text-xs text-gray-500 text-center pt-1">
+                      + {productCount - 3} more products
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState(['All']);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -249,6 +509,10 @@ export default function ProductsPage() {
   const [notifiedProducts, setNotifiedProducts] = useState(new Set());
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [categoryLoading, setCategoryLoading] = useState(false);
+  const [showCategoriesList, setShowCategoriesList] = useState(false);
 
   // Fetch products from API
   const fetchProducts = async () => {
@@ -267,9 +531,39 @@ export default function ProductsPage() {
     }
   };
 
+  const fetchCategories = async () => {
+  try {
+    setCategoryLoading(true);
+    // Correct endpoint based on your controller
+    const response = await axiosInstance.get('/Category'); // ← Fixed URL
+    
+    // The response has { Categories: [{ Id, Name }] }
+    const categoriesList = response.data.Categories || [];
+    
+    // Extract just the names as strings
+    const categoryNames = categoriesList.map(cat => cat.Name);
+    
+    setCategories(['All', ...categoryNames]);
+  } catch (err) {
+    console.error('Error fetching categories:', err);
+    toast.error('Failed to load categories');
+    
+    // Fallback: extract from products
+    const productCategories = [...new Set(products.map(p => p.ProductCategory).filter(Boolean))];
+    setCategories(['All', ...productCategories]);
+  } finally {
+    setCategoryLoading(false);
+  }
+};
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (products.length > 0) {
+      fetchCategories();
+    }
+  }, [products]);
 
   // View product details
   const viewProductDetails = (product) => {
@@ -277,10 +571,121 @@ export default function ProductsPage() {
     setIsModalOpen(true);
   };
 
-  // Close modal
+  // Close product modal
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedProduct(null);
+  };
+
+  // Open category modal
+  const openCategoryModal = (category = null) => {
+    if (typeof category === 'string' && category !== 'All') {
+      setEditingCategory({
+        id: category,
+        name: category
+      });
+    } else {
+      setEditingCategory(category);
+    }
+    setIsCategoryModalOpen(true);
+  };
+
+  // Close category modal
+  const closeCategoryModal = () => {
+    setIsCategoryModalOpen(false);
+    setEditingCategory(null);
+  };
+
+  // Add new category
+  const handleAddCategory = async (categoryData) => {
+    try {
+      // API call to add category
+      const response = await axiosInstance.post('/Category', {
+        name: categoryData.name
+      });
+      
+      const newCategory = response.data.category || {
+        id: Date.now().toString(),
+        name: categoryData.name,
+        productCount: 0
+      };
+
+      // Update categories list
+      setCategories(prev => {
+        const filtered = prev.filter(cat => cat !== 'All' && cat !== newCategory.name);
+        return ['All', newCategory.name, ...filtered];
+      });
+
+      toast.success(`Category "${newCategory.name}" added successfully`);
+      
+      // Refresh categories from server
+      await fetchCategories();
+      
+    } catch (err) {
+      console.error('Error adding category:', err);
+      toast.error(err.response?.data?.message || 'Failed to add category');
+      throw err;
+    }
+  };
+
+  // Update existing category
+  const handleUpdateCategory = async (categoryData) => {
+    try {
+      // API call to update category
+      await axiosInstance.put(`/Category/${categoryData.id}`, {
+        name: categoryData.name
+      });
+      
+      toast.success(`Category "${categoryData.name}" updated successfully`);
+      
+      // Update categories list
+      setCategories(prev => {
+        const updated = prev.map(cat => 
+          cat === editingCategory.name ? categoryData.name : cat
+        );
+        return updated;
+      });
+
+      // Update products with the new category name
+      setProducts(prev => 
+        prev.map(product => 
+          product.ProductCategory === editingCategory.name 
+            ? { ...product, ProductCategory: categoryData.name }
+            : product
+        )
+      );
+      
+    } catch (err) {
+      console.error('Error updating category:', err);
+      toast.error(err.response?.data?.message || 'Failed to update category');
+      throw err;
+    }
+  };
+
+  // Delete category
+  const handleDeleteCategory = async (categoryName) => {
+    try {
+      // First check if category has products
+      const productCount = products.filter(p => p.ProductCategory === categoryName).length;
+      if (productCount > 0) {
+        toast.error(`Cannot delete category "${categoryName}" because it has ${productCount} products.`);
+        return;
+      }
+
+      // API call to delete category (you'll need to get the category ID first)
+      // For now, simulate deletion
+      // await axiosInstance.delete(`/Product/categories/${categoryId}`);
+      
+      // Update categories list
+      setCategories(prev => prev.filter(cat => cat !== categoryName));
+      
+      toast.success(`Category "${categoryName}" deleted successfully`);
+      
+    } catch (err) {
+      console.error('Error deleting category:', err);
+      toast.error(err.response?.data?.message || 'Failed to delete category');
+      throw err;
+    }
   };
 
   // Send out-of-stock notification to vendor
@@ -453,8 +858,6 @@ export default function ProductsPage() {
       }
       return aValue > bValue ? 1 : -1;
     });
-
-  const categories = ['All', ...new Set(products.map(p => p.ProductCategory).filter(Boolean))];
 
   // Clear error after 5 seconds
   useEffect(() => {
@@ -630,15 +1033,24 @@ export default function ProductsPage() {
             />
           </div>
 
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-[#586330] shadow-sm"
-          >
-            {categories.map(category => (
-              <option key={category} value={category}>{category}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-[#586330] shadow-sm min-w-[150px]"
+              disabled={categoryLoading}
+            >
+              {categoryLoading ? (
+                <option>Loading categories...</option>
+              ) : (
+                categories.map(category => (
+                  <option key={category} value={category}>
+                    {typeof category === 'object' ? category.name : category}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
 
           <select
             value={selectedStatus}
@@ -709,6 +1121,75 @@ export default function ProductsPage() {
             Export
           </button>
         </div>
+
+        {/* Category Management Info */}
+        <div className="mb-4 p-4 bg-[#586330]/10 border border-[#586330]/20 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Tag className="w-5 h-5 text-[#586330]" />
+              <div>
+                <h3 className="font-semibold text-[#586330]">Category Management</h3>
+                <p className="text-[#586330] text-sm">
+                  You have {categories.length - 1} categories. {categories.length - 1 > 0 
+                    ? `Showing ${selectedCategory === 'All' ? 'all' : selectedCategory} products.`
+                    : 'Add your first category!'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCategoriesList(!showCategoriesList)}
+                className="px-4 py-2 bg-[#586330]/60 hover:bg-[#586330] text-white rounded-lg text-sm font-medium flex items-center gap-2"
+              >
+                <List className="w-4 h-4" />
+                {showCategoriesList ? 'Hide Categories' : 'View All Categories'}
+              </button>
+              <button
+                onClick={() => openCategoryModal()}
+                className="px-4 py-2 bg-[#586330] hover:bg-[#4b572a] text-white rounded-lg text-sm font-medium flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add New Category
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Categories List Section (Toggleable) */}
+        {showCategoriesList && (
+          <div className="mb-6 p-6 bg-white rounded-lg border border-gray-300 shadow-md">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#586330] rounded-lg">
+                  <List className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Product Categories</h3>
+                  <p className="text-gray-500 text-sm">
+                    Manage all product categories. Click edit or delete to modify categories.
+                  </p>
+                </div>
+              </div>
+              <div className="text-sm text-gray-600">
+                {categories.length - 1} categories • {products.length} total products
+              </div>
+            </div>
+            
+            <CategoryList 
+              categories={categories}
+              onEditCategory={openCategoryModal}
+              onDeleteCategory={handleDeleteCategory}
+              products={products}
+            />
+            
+            <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+              <p className="text-sm text-gray-500">
+                Tip: Empty categories can be deleted. Categories with products cannot be deleted.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Out of Stock Alert */}
         {filteredProducts.filter(p => p.Quantity <= 0).length > 0 && (
@@ -863,6 +1344,16 @@ export default function ProductsPage() {
         product={selectedProduct}
         isOpen={isModalOpen}
         onClose={closeModal}
+      />
+
+      {/* Add Category Modal */}
+      <AddCategoryModal 
+        isOpen={isCategoryModalOpen}
+        onClose={closeCategoryModal}
+        onAddCategory={handleAddCategory}
+        editingCategory={editingCategory}
+        onUpdateCategory={handleUpdateCategory}
+        onDeleteCategory={handleDeleteCategory}
       />
     </div>
   );

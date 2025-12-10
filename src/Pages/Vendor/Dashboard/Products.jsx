@@ -25,6 +25,8 @@ const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   // Server response data
   const [products, setProducts] = useState([]);
@@ -32,19 +34,13 @@ const Products = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [vendorProfile, setVendorProfile] = useState(null);
+  const [availableCategories, setAvailableCategories] = useState([]); // Categories based on profile
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-
-  const categories = [
-    { id: 'all', name: 'All Products' },
-    { id: 'Grocery', name: 'Grocery' },
-    { id: 'Furniture', name: 'Furniture' },
-    { id: 'Books', name: 'Books' },
-    { id: 'Home Appliance', name: 'Home Appliance' },
-    { id: 'Cloth', name: 'Cloth' },
-  ];
 
   const [newProduct, setNewProduct] = useState({
     productName: '',
@@ -79,6 +75,101 @@ const Products = () => {
     },
     [handleLogout]
   );
+
+  // Fetch vendor profile to get business type
+  const fetchVendorProfile = useCallback(async () => {
+    try {
+      setProfileLoading(true);
+      const response = await axiosInstance.get('/vendorprofile');
+      const profileData = response.data?.Profile || response.data?.profile;
+      
+      if (profileData) {
+        setVendorProfile(profileData);
+        console.log('📋 Vendor profile loaded:', profileData.BusinessType);
+        return profileData.BusinessType;
+      } else {
+        console.log('⚠️ No vendor profile found');
+        toast.info('Please create your profile first to add products');
+        setVendorProfile(null);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error fetching vendor profile:', error);
+      if (error.response?.status !== 404) {
+        toast.error('Failed to load vendor profile');
+      }
+      setVendorProfile(null);
+      return null;
+    } finally {
+      setProfileLoading(false);
+    }
+  }, []);
+
+  // Fetch all categories
+  const fetchCategories = useCallback(async () => {
+    try {
+      setCategoriesLoading(true);
+      const response = await axiosInstance.get('/Category');
+      
+      const allCategories = (response.data.Categories || [])
+        .map(cat => cat.Name)
+        .sort();
+
+      setCategories(allCategories);
+
+      if (allCategories.length === 0) {
+        toast.info('No categories found. Ask admin to create some.');
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      toast.error('Failed to load categories');
+      setCategories([]);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, []);
+
+  // Filter categories based on vendor profile
+  const getFilteredCategories = useCallback((allCategories, businessType) => {
+    if (!businessType) {
+      return []; // No profile, no categories available
+    }
+
+    if (businessType === 'All') {
+      // If vendor selected "All", show "All" button + all categories
+      return ['All', ...allCategories];
+    }
+
+    // If vendor has specific business type, show ONLY that category
+    return [businessType];
+  }, []);
+
+  // Load profile and categories on mount
+  useEffect(() => {
+    const loadData = async () => {
+      const businessType = await fetchVendorProfile();
+      await fetchCategories();
+      
+      // After both are loaded, filter categories
+      if (businessType) {
+        const filtered = getFilteredCategories(categories, businessType);
+        setAvailableCategories(filtered);
+        console.log('✅ Available categories for vendor:', filtered);
+      } else {
+        setAvailableCategories([]);
+      }
+    };
+
+    loadData();
+  }, [fetchVendorProfile, fetchCategories, getFilteredCategories]);
+
+  // Update available categories when categories or profile changes
+  useEffect(() => {
+    if (vendorProfile && categories.length > 0) {
+      const filtered = getFilteredCategories(categories, vendorProfile.BusinessType);
+      setAvailableCategories(filtered);
+    }
+  }, [vendorProfile, categories, getFilteredCategories]);
 
   // Normalize incoming PascalCase → camelCase
   const normalizeProductData = (product) => {
@@ -116,7 +207,7 @@ const Products = () => {
       const params = new URLSearchParams({
         pageNumber: currentPage,
         pageSize: 6,
-        category: activeCategory === 'all' ? '' : activeCategory,
+        category: activeCategory === 'All' || activeCategory === 'all' ? '' : activeCategory,
         searchTerm: searchTerm.trim(),
       });
 
@@ -124,9 +215,8 @@ const Products = () => {
         `/Product/my-products/paginated?${params.toString()}`
       );
 
-      const data = response.data; // PaginatedProductResponseDto
+      const data = response.data;
 
-      // FIX: Handle both PascalCase and camelCase response properties
       const productsArray = data.Products || data.products || [];
       const normalized = productsArray.map(normalizeProductData);
 
@@ -180,8 +270,17 @@ const Products = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Add / Update / Delete handlers remain the same
   const handleAddProduct = () => {
+    if (!vendorProfile) {
+      toast.error('Please create your vendor profile first');
+      return;
+    }
+
+    if (availableCategories.length === 0) {
+      toast.error('No categories available for your business type');
+      return;
+    }
+
     setNewProduct({
       productName: '',
       description: '',
@@ -195,6 +294,11 @@ const Products = () => {
   };
 
   const handleUpdateProduct = (product) => {
+    if (!vendorProfile) {
+      toast.error('Profile required to update products');
+      return;
+    }
+
     setEditingProduct(product);
 
     const existingImageUrls = (product.images || []).map((img) => img.imageUrl);
@@ -205,7 +309,7 @@ const Products = () => {
       price: product.price || 0,
       quantity: product.quantity || 1,
       productCategory: product.productCategory || '',
-      images: existingImageUrls, // keep old URLs (backend handles deletion separately if needed)
+      images: existingImageUrls,
       rating: product.rating || 0,
     });
     setShowUpdateModal(true);
@@ -214,6 +318,17 @@ const Products = () => {
   const validateProduct = () => {
     if (!newProduct.productName?.trim()) return toast.error('Product Name is required!'), false;
     if (!newProduct.productCategory?.trim()) return toast.error('Category is required!'), false;
+    
+    // Validate category is in available categories
+    // For "All" business type vendors, they can use any category including "All"
+    // For specific business type vendors, they can only use that specific category
+    const validCategories = availableCategories;
+    
+    if (!validCategories.includes(newProduct.productCategory)) {
+      toast.error('Selected category is not available for your business type');
+      return false;
+    }
+    
     if (!newProduct.description?.trim()) return toast.error('Description is required!'), false;
     if (newProduct.price <= 0) return toast.error('Price must be > 0!'), false;
     if (newProduct.quantity < 0) return toast.error('Quantity cannot be negative!'), false;
@@ -244,7 +359,7 @@ const Products = () => {
 
       toast.success('Product added successfully!');
       setShowAddModal(false);
-      setCurrentPage(1); // go back to first page
+      setCurrentPage(1);
       fetchProducts();
     } catch (error) {
       handleApiError(error, 'Failed to add product');
@@ -268,7 +383,6 @@ const Products = () => {
       formData.append('productCategory', newProduct.productCategory.trim());
       formData.append('rating', parseFloat(newProduct.rating) || 0);
 
-      // Only append new files (strings = old URLs, File = new)
       newProduct.images.forEach((img) => {
         if (img instanceof File) formData.append('images', img);
       });
@@ -355,7 +469,6 @@ const Products = () => {
     </div>
   );
 
-  // Pagination UI helpers
   const getPageNumbers = () => {
     const pages = [];
     const max = 5;
@@ -474,6 +587,41 @@ const Products = () => {
     );
   };
 
+  // Show profile creation prompt if no profile
+  if (!profileLoading && !vendorProfile) {
+    return (
+      <div className="flex min-h-screen bg-gray-100">
+        <Sidebar handleLogout={handleLogout} activeView={activeView} />
+        <div className="flex-1 p-6 text-black">
+          <header className="mb-6">
+            <h1 className="text-3xl font-bold text-gray-800">My Products</h1>
+            <p className="text-gray-600 mt-2">Manage your product inventory</p>
+          </header>
+          
+          <div className="bg-white rounded-xl shadow-md p-8 text-center">
+            <div className="w-24 h-24 bg-yellow-100 rounded-full mx-auto mb-6 flex items-center justify-center">
+              <span className="text-4xl">📋</span>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Profile Required</h3>
+            <p className="text-gray-600 mb-6">
+              You need to create your vendor profile before you can add products.
+              Your profile determines which product categories you can use.
+            </p>
+            <button
+              onClick={() => navigate('/vendor-dashboard', { state: { openProfileModal: true } })}
+              className="bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition font-medium"
+            >
+              Create Profile Now
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if vendor has "All" business type
+  const isAllBusinessType = vendorProfile?.BusinessType === 'All';
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       <Sidebar handleLogout={handleLogout} activeView={activeView} />
@@ -481,11 +629,20 @@ const Products = () => {
         <header className="mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">My Products</h1>
-            <p className="text-gray-600 mt-2">Manage your product inventory</p>
+            <p className="text-gray-600 mt-2">
+              Manage your product inventory
+              {vendorProfile && (
+                <span className="ml-2 text-sm bg-[#586330]/10 text-[#586330] px-2 py-1 rounded">
+                  Business: {vendorProfile.BusinessType === 'All' ? 'Multiple Categories' : vendorProfile.BusinessType}
+                </span>
+              )}
+            </p>
           </div>
           <button
             onClick={handleAddProduct}
-            className="bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition flex items-center space-x-2 font-medium"
+            disabled={!vendorProfile || availableCategories.length === 0}
+            className={`${!vendorProfile || availableCategories.length === 0 ? 'opacity-50 cursor-not-allowed' : ''} bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition flex items-center space-x-2 font-medium`}
+            title={!vendorProfile ? 'Create profile first' : availableCategories.length === 0 ? 'No categories available' : 'Add new product'}
           >
             <span className="text-lg">+</span>
             <span>Add Product</span>
@@ -513,21 +670,44 @@ const Products = () => {
         </div>
 
         {/* Category Filters */}
-        <div className="flex gap-4 mb-8 flex-wrap">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => handleCategoryFilter(cat.id)}
-              className={`px-4 py-2 rounded-lg font-medium transition ${
-                activeCategory === cat.id
-                  ? 'bg-[#586330] text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
+        {categoriesLoading || profileLoading ? (
+          <div className="mb-8 text-center py-4">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-4 border-[#586330]"></div>
+            <p className="mt-2 text-gray-600">Loading categories...</p>
+          </div>
+        ) : availableCategories.length > 0 ? (
+          <div className="mb-8">
+            <p className="text-sm text-gray-600 mb-2">
+              {isAllBusinessType 
+                ? 'Available categories (Multiple Categories Business):' 
+                : `Available category (${vendorProfile?.BusinessType} Business):`}
+            </p>
+            <div className="flex gap-4 flex-wrap">
+              {/* Show available categories including "All" if applicable */}
+              {availableCategories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => handleCategoryFilter(cat)}
+                  className={`px-4 py-2 rounded-lg font-medium transition ${
+                    activeCategory === cat
+                      ? 'bg-[#586330] text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                  }`}
+                  title={cat === 'All' ? 'Show all products' : `Show ${cat} products`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-yellow-800">
+              No categories available for your business type "{vendorProfile?.BusinessType}".
+              Please contact admin or update your profile.
+            </p>
+          </div>
+        )}
 
         {/* Loading */}
         {loading && (
@@ -542,6 +722,8 @@ const Products = () => {
           <div className="mb-6 flex justify-between items-center">
             <span className="text-sm text-gray-600">
               Showing page {currentPage} of {totalPages} ({totalCount} products)
+              {activeCategory !== 'All' && activeCategory !== 'all' && ` in "${activeCategory}" category`}
+              {(activeCategory === 'All' || activeCategory === 'all') && ' (All Categories)'}
             </span>
           </div>
         )}
@@ -562,19 +744,19 @@ const Products = () => {
               📦
             </div>
             <h3 className="text-xl font-semibold text-gray-600">
-              {searchTerm || activeCategory !== 'all' ? 'No products found' : 'No products yet'}
+              {searchTerm || (activeCategory !== 'All' && activeCategory !== 'all') ? 'No products found' : 'No products yet'}
             </h3>
             <p className="text-gray-500 mt-2">
               {searchTerm
                 ? 'Try different keywords'
-                : activeCategory !== 'all'
-                ? `No items in "${categories.find((c) => c.id === activeCategory)?.name}"`
+                : activeCategory !== 'All' && activeCategory !== 'all'
+                ? `No items in "${activeCategory}" category`
                 : 'Start by adding your first product'}
             </p>
-            {totalCount === 0 && (
+            {availableCategories.length > 0 && (
               <button
                 onClick={handleAddProduct}
-                className="mt-6 bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80"
+                className="mt-6 bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition font-medium"
               >
                 Add Your First Product
               </button>
@@ -613,7 +795,7 @@ const Products = () => {
           </div>
         )}
 
-        {/* Modals */}
+        {/* Modals - Pass available categories (including "All" if applicable) */}
         {showAddModal && (
           <ProductModal
             title="Add New Product"
@@ -626,7 +808,7 @@ const Products = () => {
             }}
             handleImageUpload={handleImageUpload}
             handleRemoveImage={handleRemoveImage}
-            categories={categories.filter((c) => c.id !== 'all')}
+            categories={availableCategories} // Use all available categories
             isSaving={saving}
           />
         )}
@@ -644,7 +826,7 @@ const Products = () => {
             }}
             handleImageUpload={handleImageUpload}
             handleRemoveImage={handleRemoveImage}
-            categories={categories.filter((c) => c.id !== 'all')}
+            categories={availableCategories} // Use all available categories
             isSaving={saving}
             editingProduct={editingProduct}
           />

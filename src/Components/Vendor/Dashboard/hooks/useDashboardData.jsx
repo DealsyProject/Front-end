@@ -10,12 +10,7 @@ export const useDashboardData = (navigate) => {
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [messageThreads] = useState([
-    { id: 1, title: 'Support Team for Vendor', preview: 'Welcome to Dealsy! How can we help you?', time: '2 hours ago', unread: true },
-    { id: 2, title: 'Support Team from Customer', preview: 'Interested in your products...', time: '1 day ago', unread: false }
-  ]);
-
-  // Fetch real notifications from API
+  
   const fetchNotifications = useCallback(async () => {
     try {
       console.log('🔔 [Dashboard] Fetching notifications from API...');
@@ -81,8 +76,7 @@ export const useDashboardData = (navigate) => {
       
       const mockFinancialData = [
         { title: 'Total Revenue', value: '₹25,430.00', subtitle: '+12% from last month' },
-        { title: 'Total Refunded', value: '₹1,340.00', subtitle: '5 refund requests' },
-        { title: 'Overdue Bills', value: '₹2,340.00', subtitle: '2 overdue payments' }
+        { title: 'Total Refunded', value: '₹1,340.00', subtitle: '5 refund requests' }
       ];
       
       setFinancialData(mockFinancialData);
@@ -214,7 +208,6 @@ export const useDashboardData = (navigate) => {
     financialData,
     recentActivities,
     isLoading,
-    messageThreads,
     notifications,
     fetchDashboardData,
     refreshNotifications: fetchNotifications,
@@ -251,9 +244,7 @@ const formatActivityDate = (dateString) => {
 
 const getDefaultFinancialData = (subtitle = 'No data available') => [
   { title: 'Total Revenue', value: '₹0.00', subtitle },
-  { title: 'Total Payments', value: '₹0.00', subtitle },
-  { title: 'Total Refunded', value: '₹0.00', subtitle },
-  { title: 'Overdue Bills', value: '₹0.00', subtitle }
+  { title: 'Total Refunded', value: '₹0.00', subtitle }
 ];
 
 const getDefaultActivities = () => [
@@ -263,3 +254,7 @@ const getDefaultActivities = () => [
     date: 'Just now' 
   }
 ];
+
+
+
+

@@ -93,7 +93,7 @@ export default function Navbar() {
             placeholder="looking for?"
             className="bg-white/40 backdrop-blur-md px-4 py-2 rounded-full text-sm outline-none"
           />
-          <FaSearch className="absolute right-3 top-2 text-gray-500" />
+          <FaSearch className="absolute right-3 top-2 text-gray-500 cursor-pointer" />
         </div>
       </div>
 
@@ -101,7 +101,7 @@ export default function Navbar() {
       <div className="bg-white/40 backdrop-blur-md rounded-full px-6 py-2 flex items-center space-x-4">
         <button
           onClick={() => navigate("/customerproducts")}
-          className="text-sm font-medium hover:text-[#586330] transition"
+          className="text-sm font-medium hover:text-[#586330] transition cursor-pointer"
         >
           Products
         </button>
@@ -114,7 +114,7 @@ export default function Navbar() {
               navigate("/", { state: { scrollTo: "footer" } });
             }
           }}
-          className="text-sm font-medium hover:text-[#586330] transition"
+          className="text-sm font-medium hover:text-[#586330] transition cursor-pointer"
         >
           About Us
         </button>
@@ -127,7 +127,7 @@ export default function Navbar() {
               navigate("/", { state: { scrollTo: "footer" } });
             }
           }}
-          className="text-sm font-medium hover:text-[#586330] transition"
+          className="text-sm font-medium hover:text-[#586330] transition cursor-pointer"
         >
           Contact
         </button>
@@ -141,7 +141,7 @@ export default function Navbar() {
             <div className="bg-white/40 backdrop-blur-md rounded-full px-3 py-2 flex items-center">
               <button
                 onClick={() => navigate("/customerchat")}
-                className="bg-[#586330] text-white rounded-full px-3 py-2 flex items-center"
+                className="bg-[#586330] text-white rounded-full px-3 py-2 flex items-center cursor-pointer"
               >
                 <IoChatbubbleEllipsesOutline className="text-xl" />
               </button>

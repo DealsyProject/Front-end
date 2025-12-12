@@ -14,7 +14,7 @@ export default function ProfilePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
 
-  const menu = ["My Profile", "My Orders", "Returned", "Refunded"];
+  const menu = ["My Profile", "My Orders", "Returned", "Refunded","Rate & Review"];
 
   useEffect(() => {
     const fetchData = async () => {

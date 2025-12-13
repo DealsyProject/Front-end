@@ -96,140 +96,150 @@ export default function CustomerCheckout() {
     });
   };
 
-  const handlePayment = async () => {
-    if (!form.name || !form.phone || !form.address || !form.pincode) {
-      alert("Please fill all required fields");
-      return;
-    }
+ const handlePayment = async () => {
+  if (!form.name || !form.phone || !form.address || !form.pincode) {
+    alert("Please fill all required fields");
+    return;
+  }
 
-    if (cart.length === 0) {
-      alert("Your cart is empty");
-      return;
-    }
+  if (cart.length === 0) {
+    alert("Your cart is empty");
+    return;
+  }
 
-    setProcessing(true);
-    try {
-      // Remove shipping fee - use only product total
-      const total = cart.reduce((sum, item) => sum + (item.Price * item.Quantity), 0);
+  setProcessing(true);
+  try {
+    const total = cart.reduce((sum, item) => sum + (item.Price * item.Quantity), 0);
 
-      // Step 1: Create order with payment in one API call
-      const orderItems = cart.map(item => ({
-        productId: item.ProductId,
-        quantity: item.Quantity,
-        price: item.Price
-      }));
+    const orderItems = cart.map(item => ({
+      productId: item.ProductId,
+      quantity: item.Quantity,
+      price: item.Price
+    }));
 
-      const shippingAddress = `${form.address}, ${form.pincode}`;
+    const shippingAddress = `${form.address}, ${form.pincode}`;
 
-      const orderResponse = await axiosInstance.post('/Order/create', {
-        items: orderItems,
-        shippingAddress: shippingAddress,
-        currency: 'INR'
-      });
+    // Step 1: Create order
+    const orderResponse = await axiosInstance.post('/Order/create', {
+      items: orderItems,
+      shippingAddress: shippingAddress,
+      currency: 'INR'
+    });
 
-      console.log('✅ Order with payment created:', orderResponse.data);
+    console.log('✅ Order created:', orderResponse.data);
 
-      // Extract Razorpay details from response - FIXED PROPERTY NAMES
-      const razorpayData = orderResponse.data;
-      console.log('🔍 Full Razorpay response:', razorpayData);
+    const razorpayData = orderResponse.data;
+    
+    // Extract with fallback values
+    const razorpayKey = razorpayData.RazorpayKey || razorpayData.razorpayKey || 'rzp_test_HDLC1terx8qsOw';
+    const razorpayOrderId = razorpayData.RazorpayOrderId || razorpayData.razorpayOrderId;
+    const amount = razorpayData.Amount || razorpayData.amount || total;
+    const currency = razorpayData.Currency || razorpayData.currency || 'INR';
 
-      // Use correct property names that match your backend response
-      const razorpayKey = razorpayData.RazorpayKey || razorpayData.razorpayKey || razorpayData.key;
-      const razorpayOrderId = razorpayData.RazorpayOrderId || razorpayData.razorpayOrderId || razorpayData.orderId;
-      const amount = razorpayData.Amount || razorpayData.amount;
-      const currency = razorpayData.Currency || razorpayData.currency || 'INR';
-
-      console.log('🔍 Extracted values:', {
-        razorpayKey,
-        razorpayOrderId,
-        amount,
-        currency
-      });
-
-      if (!razorpayKey || !razorpayOrderId) {
-        console.error('❌ Missing Razorpay configuration:', razorpayData);
-        alert('Payment configuration error. Please contact support.');
-        return;
-      }
-
-      // Load Razorpay script
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        alert('Razorpay SDK failed to load. Are you online?');
-        return;
-      }
-
-      // Step 2: Initialize Razorpay payment
-      const options = {
-        key: razorpayKey,
-        amount: amount * 100, // Convert to paise
-        currency: currency,
-        name: 'Dealsy Furniture',
-        description: 'Order Payment',
-        order_id: razorpayOrderId,
-        handler: async function (response) {
-          try {
-            // Step 3: Verify payment with items
-            const verifyPayload = {
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-              items: orderItems,
-              shippingAddress: shippingAddress
-            };
-
-            const verifyResponse = await axiosInstance.post('/Order/verify-payment', verifyPayload);
-
-            console.log('✅ Payment verified:', verifyResponse.data);
-
-            // Check for both 'Success' and 'success' to be safe
-            if (verifyResponse.data.Success || verifyResponse.data.success) {
-              // Clear cart after successful payment
-              await clearCart();
-              alert('✅ Payment Successful! Your order has been placed.');
-              navigate('/');
-            } else {
-              const errorMessage = verifyResponse.data.Message || verifyResponse.data.message || 'Payment verification failed';
-              alert(`❌ ${errorMessage}`);
-            }
-          } catch (error) {
-            console.error('Payment verification failed:', error);
-            alert('❌ Payment verification failed. Please contact support with your payment ID: ' + response.razorpay_payment_id);
-          }
-        },
-        prefill: {
-          name: form.name,
-          email: form.email,
-          contact: form.phone
-        },
-        notes: {
-          address: shippingAddress
-        },
-        theme: {
-          color: '#586330'
-        },
-        modal: {
-          ondismiss: function () {
-            setProcessing(false);
-            alert('Payment cancelled. Your order has been saved and you can complete the payment later.');
-          }
-        }
-      };
-
-      const razorpay = new window.Razorpay(options);
-      razorpay.on('payment.failed', function (response) {
-        console.error('Payment failed:', response.error);
-        alert('❌ Payment failed: ' + response.error.description);
-        setProcessing(false);
-      });
-      razorpay.open();
-    } catch (error) {
-      console.error('❌ Payment initialization failed:', error);
-      alert(error.response?.data?.message || error.message || 'Payment initialization failed. Please try again.');
+    if (!razorpayOrderId) {
+      console.error('❌ Missing Razorpay Order ID:', razorpayData);
+      alert('Payment configuration error. Please contact support.');
       setProcessing(false);
+      return;
     }
-  };
 
+    // Load Razorpay script
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded) {
+      alert('Razorpay SDK failed to load. Are you online?');
+      setProcessing(false);
+      return;
+    }
+
+    // Step 2: Initialize Razorpay payment
+    const options = {
+      key: razorpayKey,
+      amount: Math.round(amount * 100), // Convert to paise and round
+      currency: currency,
+      name: 'Dealsy Furniture',
+      description: 'Order Payment',
+      order_id: razorpayOrderId,
+      handler: async function (response) {
+        try {
+          console.log('🔍 Razorpay response:', response);
+          
+          // Step 3: Verify payment with correct payload structure
+          const verifyPayload = {
+            razorpayOrderId: response.razorpay_order_id,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpaySignature: response.razorpay_signature
+            // Note: items and shippingAddress might not be needed for verification
+          };
+
+          console.log('🔍 Sending verification payload:', verifyPayload);
+
+          const verifyResponse = await axiosInstance.post('/Payment/verify', verifyPayload);
+          console.log('✅ Payment verification response:', verifyResponse.data);
+
+          if (verifyResponse.data.success || verifyResponse.data.Success) {
+            // Clear cart
+            await clearCart();
+            
+            // Show success message with order ID
+            const orderId = verifyResponse.data.orderId || verifyResponse.data.OrderId;
+            alert(`✅ Payment Successful! Order #${orderId} has been placed.`);
+            navigate('/customerprofile');
+          } else {
+            const errorMsg = verifyResponse.data.message || verifyResponse.data.Message || 'Payment verification failed';
+            alert(`❌ ${errorMsg}`);
+          }
+        } catch (error) {
+          console.error('Payment verification error:', error);
+          
+          if (error.response) {
+            console.error('Response data:', error.response.data);
+            console.error('Response status:', error.response.status);
+          }
+          
+          alert('❌ Payment verification failed. Please contact support with Payment ID: ' + response.razorpay_payment_id);
+        }
+      },
+      prefill: {
+        name: form.name,
+        email: form.email,
+        contact: form.phone
+      },
+      notes: {
+        address: shippingAddress
+      },
+      theme: {
+        color: '#586330'
+      },
+      modal: {
+        ondismiss: function () {
+          setProcessing(false);
+          alert('Payment cancelled. You can try again later from your orders page.');
+        }
+      }
+    };
+
+    const razorpay = new window.Razorpay(options);
+    
+    razorpay.on('payment.failed', function (response) {
+      console.error('Payment failed:', response.error);
+      alert(`❌ Payment failed: ${response.error.description}`);
+      setProcessing(false);
+    });
+    
+    razorpay.open();
+    
+  } catch (error) {
+    console.error('❌ Payment initialization failed:', error);
+    
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+    }
+    
+    alert(error.response?.data?.message || error.message || 'Payment initialization failed. Please try again.');
+    setProcessing(false);
+  }
+};
   const clearCart = async () => {
     try {
       for (const item of cart) {

@@ -95,6 +95,7 @@ const Invoices = () => {
         // Use stored statuses from backend
         const orderStatus = invoice.OrderStatus || 'Pending';
         const confirmationStatus = invoice.ConfirmationStatus || 'Pending';
+        const shippedDate = invoice.ShippedDate || invoice.shippedDate;
         
         // Determine delivery status from stored order status
         let deliveryStatus = 'pending';
@@ -113,6 +114,7 @@ const Invoices = () => {
           amount: invoice.Amount || invoice.amount || 0,
           carrierName: invoice.CarrierName || invoice.carrierName,
           trackingNumber: invoice.TrackingNumber || invoice.trackingNumber,
+          shippedDate: shippedDate,
           deliveredDate: invoice.DeliveredDate || invoice.deliveredDate,
           orderId: orderId,
           customer: {
@@ -562,12 +564,51 @@ const Invoices = () => {
     po.deliveryStatus !== 'delivered'
   );
 
-  const shippedOrders = purchaseOrders.filter(po => 
-    po.deliveryStatus === 'in-transit' || po.status === 'Shipped'
-  );
-
-  const deliveredOrders = purchaseOrders.filter(po => 
-    po.deliveryStatus === 'delivered' || po.status === 'Delivered'
+  const shippedOrders = invoices.filter(inv => inv.orderStatus === 'Shipped');
+  
+  // Combine delivered orders from both purchaseOrders and invoices
+  const deliveredOrders = [
+    // Get delivered orders from purchaseOrders
+    ...purchaseOrders.filter(po => 
+      po.deliveryStatus === 'delivered' || po.status === 'Delivered'
+    ).map(po => ({
+      orderId: po.orderId,
+      customerName: po.customerName,
+      customer: { name: po.customerName, email: po.customerEmail },
+      totalAmount: po.totalAmount,
+      amount: po.totalAmount,
+      orderDate: po.orderDate,
+      date: po.orderDate,
+      status: po.status,
+      deliveryStatus: po.deliveryStatus,
+      trackingNumber: po.trackingNumber,
+      carrierName: po.carrierName,
+      deliveredDate: po.deliveredDate,
+      type: 'purchaseOrder'
+    })),
+    
+    // Get delivered orders from invoices
+    ...invoices.filter(inv => inv.orderStatus === 'Delivered')
+      .map(inv => ({
+        orderId: inv.orderId,
+        customerName: inv.customer?.name,
+        customer: inv.customer,
+        totalAmount: inv.amount,
+        amount: inv.amount,
+        orderDate: inv.invoiceDate || inv.date,
+        date: inv.invoiceDate || inv.date,
+        status: 'Delivered',
+        deliveryStatus: 'delivered',
+        trackingNumber: inv.trackingNumber || inv.shipment?.trackingNumber,
+        carrierName: inv.carrierName || inv.shipment?.carrier,
+        deliveredDate: inv.deliveredDate,
+        type: 'invoice'
+      }))
+  ].filter((item, index, self) => 
+    // Remove duplicates by orderId (keep invoice data if available)
+    index === self.findIndex(t => t.orderId === item.orderId && t.type === 'invoice') ||
+    index === self.findIndex(t => t.orderId === item.orderId && t.type === 'purchaseOrder' && 
+      !self.some(inv => inv.orderId === item.orderId && inv.type === 'invoice'))
   );
 
   return (
@@ -671,23 +712,31 @@ const Invoices = () => {
                         <th className="px-6 py-4 text-left">Customer</th>
                         <th className="px-6 py-4 text-left">Tracking</th>
                         <th className="px-6 py-4 text-left">Carrier</th>
+                        <th className="px-6 py-4 text-left">Shipped Date</th>
                         <th className="px-6 py-4 text-left">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {shippedOrders.map(po => (
-                        <tr key={po.orderId} className="border-b hover:bg-[#F5F1E8]">
-                          <td className="px-6 py-4">Order {po.orderId}</td>
-                          <td className="px-6 py-4">{po.customerName || 'Unknown Customer'}</td>
+                      {shippedOrders.map(inv => (
+                        <tr key={inv.invoiceId} className="border-b hover:bg-[#F5F1E8]">
+                          <td className="px-6 py-4">Order {inv.orderId}</td>
+                          <td className="px-6 py-4">{inv.customer?.name || 'Unknown Customer'}</td>
                           <td className="px-6 py-4">
                             <span className="font-mono bg-gray-100 px-2 py-1 rounded">
-                              {po.trackingNumber || 'No tracking'}
+                              {inv.trackingNumber || inv.shipment?.trackingNumber || 'No tracking'}
                             </span>
                           </td>
-                          <td className="px-6 py-4">{po.carrierName || 'N/A'}</td>
+                          <td className="px-6 py-4">{inv.carrierName || inv.shipment?.carrier || 'N/A'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {inv.shippedDate ? formatDate(inv.shippedDate) : formatDate(inv.invoiceDate)}
+                          </td>
                           <td className="px-6 py-4">
                             <button 
-                              onClick={() => markAsDelivered(po)} 
+                              onClick={() => {
+                                // Find the corresponding purchase order
+                                const po = purchaseOrders.find(p => p.orderId == inv.orderId);
+                                if (po) markAsDelivered(po);
+                              }} 
                               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                             >
                               Mark Delivered
@@ -712,28 +761,41 @@ const Invoices = () => {
                         <th className="px-6 py-4 text-left">Tracking Id</th>
                         <th className="px-6 py-4 text-left">Carrier Name</th>
                         <th className="px-6 py-4 text-left">Total</th>
+                        <th className="px-6 py-4 text-left">Delivered Date</th>
                         <th className="px-6 py-4 text-left">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {deliveredOrders.map(po => (
-                        <tr key={po.orderId} className="border-b hover:bg-[#F5F1E8]">
-                          <td className="px-6 py-4">Order {po.orderId}</td>
-                          <td className="px-6 py-4">{po.customerName || 'Unknown Customer'}</td>
-                          <td className="px-6 py-4">
-                            <span className="font-mono bg-gray-100 px-2 py-1 rounded">
-                              {po.trackingNumber || 'No tracking'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">{po.carrierName || 'N/A'}</td>
-                          <td className="px-6 py-4 font-bold text-[#586330]">{formatCurrency(po.totalAmount)}</td>
-                          <td className="px-6 py-4">
-                            <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">
-                              Delivered
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {deliveredOrders.map(deliveredItem => {
+                        // Find the corresponding invoice for shipping information
+                        const invoice = invoices.find(inv => inv.orderId == deliveredItem.orderId);
+                        
+                        return (
+                          <tr key={deliveredItem.orderId} className="border-b hover:bg-[#F5F1E8]">
+                            <td className="px-6 py-4">Order {deliveredItem.orderId}</td>
+                            <td className="px-6 py-4">{deliveredItem.customerName || deliveredItem.customer?.name || 'Unknown Customer'}</td>
+                            <td className="px-6 py-4">
+                              <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                                {invoice?.trackingNumber || deliveredItem.trackingNumber || 'No tracking'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">{invoice?.carrierName || deliveredItem.carrierName || 'N/A'}</td>
+                            <td className="px-6 py-4 font-bold text-[#586330]">
+                              {formatCurrency(deliveredItem.totalAmount || deliveredItem.amount || 0)}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {deliveredItem.deliveredDate ? formatDate(deliveredItem.deliveredDate) : 
+                               invoice?.deliveredDate ? formatDate(invoice.deliveredDate) : 
+                               formatDate(deliveredItem.orderDate || deliveredItem.date)}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">
+                                Delivered
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

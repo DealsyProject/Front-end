@@ -4,25 +4,16 @@ import Navbar from '../../Components/Admin/Navbar.jsx';
 import axiosInstance from '../../Components/utils/axiosInstance.js';
 import { toast } from 'react-toastify';
 
-// Product Detail Modal Component
+// Product Detail Modal Component with Image Gallery
 const ProductDetailModal = ({ product, isOpen, onClose }) => {
-  if (!isOpen || !product) return null;
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  
+  useEffect(() => {
+    // Reset to first image when product changes
+    setSelectedImageIndex(0);
+  }, [product]);
 
-  const getProductImage = (product) => {
-    if (!product.Images || product.Images.length === 0) {
-      return null;
-    }
-    
-    if (product.Images[0] && typeof product.Images[0] === 'object' && product.Images[0].ImageData) {
-      return product.Images[0].ImageData;
-    }
-    
-    if (typeof product.Images[0] === 'string') {
-      return product.Images[0];
-    }
-    
-    return null;
-  };
+  if (!isOpen || !product) return null;
 
   const getStatusColor = (product) => {
     if (product.Quantity <= 0) {
@@ -40,11 +31,25 @@ const ProductDetailModal = ({ product, isOpen, onClose }) => {
     return 'In Stock';
   };
 
-  const productImage = getProductImage(product);
+  // Get selected image or fallback
+  const getSelectedImage = () => {
+    if (!product.Images || product.Images.length === 0) {
+      return null;
+    }
+    
+    if (selectedImageIndex < product.Images.length) {
+      return product.Images[selectedImageIndex].ImageUrl;
+    }
+    
+    // Fallback to first image if index is out of bounds
+    return product.Images[0]?.ImageUrl || null;
+  };
+
+  const selectedImage = getSelectedImage();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -69,32 +74,93 @@ const ProductDetailModal = ({ product, isOpen, onClose }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left Column - Images and Basic Info */}
             <div className="space-y-6">
-              {/* Product Image */}
+              {/* Main Product Image with Navigation */}
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                {productImage ? (
-                  <img 
-                    src={productImage} 
-                    alt={product.ProductName}
-                    className="w-full h-64 object-cover rounded-lg"
-                  />
-                ) : (
-                  <div className="w-full h-64 bg-[#e5e9d3] rounded-lg flex items-center justify-center">
-                    <Package className="w-16 h-16 text-[#586330]" />
+                <div className="relative">
+                  {selectedImage ? (
+                    <img 
+                      src={selectedImage} 
+                      alt={`${product.ProductName} - Image ${selectedImageIndex + 1}`}
+                      className="w-full h-80 object-contain rounded-lg"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div className={`image-fallback w-full h-80 bg-[#e5e9d3] rounded-lg flex items-center justify-center ${selectedImage ? 'hidden' : 'flex'}`}>
+                    <Package className="w-24 h-24 text-[#586330]" />
+                  </div>
+                  
+                  {/* Navigation Arrows (only show if multiple images) */}
+                  {product.Images && product.Images.length > 1 && (
+                    <>
+                      {selectedImageIndex > 0 && (
+                        <button
+                          onClick={() => setSelectedImageIndex(prev => prev - 1)}
+                          className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                        </button>
+                      )}
+                      {selectedImageIndex < product.Images.length - 1 && (
+                        <button
+                          onClick={() => setSelectedImageIndex(prev => prev + 1)}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+                
+                {/* Image Counter */}
+                {product.Images && product.Images.length > 1 && (
+                  <div className="text-center mt-2 text-sm text-gray-500">
+                    Image {selectedImageIndex + 1} of {product.Images.length}
+                    {product.Images[selectedImageIndex]?.IsPrimary && (
+                      <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">Primary</span>
+                    )}
                   </div>
                 )}
                 
-                {/* Image Gallery */}
+                {/* Thumbnail Gallery */}
                 {product.Images && product.Images.length > 1 && (
-                  <div className="flex gap-2 mt-4 overflow-x-auto">
-                    {product.Images.slice(0, 3).map((image, index) => (
-                      <div key={index} className="flex-shrink-0">
-                        <img 
-                          src={typeof image === 'object' ? image.ImageData : image}
-                          alt={`${product.ProductName} ${index + 1}`}
-                          className="w-16 h-16 object-cover rounded border border-gray-300"
-                        />
-                      </div>
-                    ))}
+                  <div className="mt-4">
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {product.Images.map((image, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setSelectedImageIndex(index)}
+                          className={`flex-shrink-0 relative rounded border-2 transition-all ${
+                            selectedImageIndex === index 
+                              ? 'border-[#586330] ring-2 ring-[#586330]/20' 
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          <img 
+                            src={image.ImageUrl}
+                            alt={`${product.ProductName} thumbnail ${index + 1}`}
+                            className="w-20 h-20 object-cover rounded"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = `https://placehold.co/80x80/e5e9d3/586330?text=${product.ProductName?.[0] || 'P'}`;
+                            }}
+                          />
+                          {image.IsPrimary && (
+                            <div className="absolute top-1 left-1 w-5 h-5 bg-blue-600 text-white text-xs flex items-center justify-center rounded-full">
+                              P
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -151,7 +217,7 @@ const ProductDetailModal = ({ product, isOpen, onClose }) => {
               {/* Description */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
-                <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-60 overflow-y-auto">
                   {product.Description || 'No description available.'}
                 </p>
               </div>
@@ -205,15 +271,46 @@ const ProductDetailModal = ({ product, isOpen, onClose }) => {
                 )}
               </div>
 
-              {/* Additional Images Count */}
+              {/* Image Information */}
               {product.Images && product.Images.length > 0 && (
-                <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Package className="w-4 h-4 text-purple-600" />
+                <div className="bg-purple-50 rounded-lg border border-purple-200 p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Package className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-purple-900">Image Details</h4>
+                      <p className="text-sm text-purple-600">
+                        {product.Images.length} image(s) available
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-purple-600">Total Images</p>
-                    <p className="font-semibold text-purple-900">{product.Images.length} image(s)</p>
+                  
+                  <div className="space-y-2">
+                    {product.Images.map((image, index) => (
+                      <div 
+                        key={index} 
+                        className={`flex items-center justify-between p-2 rounded ${
+                          selectedImageIndex === index ? 'bg-purple-100' : 'bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-700">Image {index + 1}</span>
+                          {image.IsPrimary && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">Primary</span>
+                          )}
+                          {image.ImageOrder && (
+                            <span className="text-xs text-gray-500">Order: {image.ImageOrder}</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setSelectedImageIndex(index)}
+                          className="text-sm text-purple-600 hover:text-purple-800"
+                        >
+                          View
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -234,7 +331,6 @@ const ProductDetailModal = ({ product, isOpen, onClose }) => {
     </div>
   );
 };
-
 // Add Category Modal Component
 const AddCategoryModal = ({ isOpen, onClose, onAddCategory, editingCategory, onUpdateCategory, onDeleteCategory }) => {
   const [categoryName, setCategoryName] = useState(editingCategory?.name || '');
@@ -891,18 +987,21 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
     return <CheckCircle className="w-4 h-4 text-green-600" />;
   };
 
-  // Get image URL
+  // Get image URL - FIXED FUNCTION
   const getProductImage = (product) => {
     if (!product.Images || product.Images.length === 0) {
       return null;
     }
     
-    if (product.Images[0] && typeof product.Images[0] === 'object' && product.Images[0].ImageData) {
-      return product.Images[0].ImageData;
+    // Find primary image first
+    const primaryImage = product.Images.find(img => img.IsPrimary);
+    if (primaryImage?.ImageUrl) {
+      return primaryImage.ImageUrl;
     }
     
-    if (typeof product.Images[0] === 'string') {
-      return product.Images[0];
+    // Fallback to first image
+    if (product.Images[0]?.ImageUrl) {
+      return product.Images[0].ImageUrl;
     }
     
     return null;
@@ -985,6 +1084,7 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
                       alt={product.ProductName}
                       className="w-12 h-12 rounded object-cover border border-gray-300"
                       onError={(e) => {
+                        e.target.onerror = null;
                         e.target.style.display = 'none';
                         e.target.nextSibling.style.display = 'flex';
                       }}
@@ -1359,6 +1459,7 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
                               alt={product.ProductName}
                               className="w-10 h-10 rounded object-cover border border-[#a5ad8b]"
                               onError={(e) => {
+                                e.target.onerror = null;
                                 e.target.style.display = 'none';
                                 e.target.nextSibling.style.display = 'flex';
                               }}

@@ -3,6 +3,7 @@ import * as signalR from "@microsoft/signalr";
 import { jwtDecode } from "jwt-decode";
 import Navbar from "../../Components/customer/Common/Navbar";
 import { useNavigate } from "react-router-dom"; // Added import
+import { toast } from "react-toastify";
 
 function CustomerChat() {
   const navigate = useNavigate(); // Added navigate hook
@@ -26,7 +27,7 @@ function CustomerChat() {
       try {
         const token = localStorage.getItem("authToken");
         if (!token) {
-          alert("Please login first");
+          toast.warning("Please login first");
           return;
         }
 
@@ -42,7 +43,7 @@ function CustomerChat() {
 
         const isCustomer = role === "Customer" || role === "3" || Number(role) === 3;
         if (!isCustomer) {
-          alert("Access denied. Customers only.");
+          toast.error("Access denied. Customers only.");
           return;
         }
 
@@ -98,7 +99,7 @@ function CustomerChat() {
         console.error("SignalR connection failed:", e);
         setConnectionStatus("Failed");
         setIsConnecting(false);
-        alert("Chat connection failed. Please refresh.");
+        toast.error("Chat connection failed. Please refresh.");
       }
     };
 

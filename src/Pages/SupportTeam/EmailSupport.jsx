@@ -1,6 +1,7 @@
 import React, { useRef, useReducer, useEffect, useCallback, useState } from "react";
 import emailjs from "@emailjs/browser";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 // --- Constants & Configuration ---
 const STYLES = {
@@ -122,7 +123,7 @@ export default function AdvancedEmailSupport({ setCurrentView }) {
   const [characterCount, setCharacterCount] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  
+     const navigate=useNavigate();
   const { 
     name, email, subject, message, priority, category, attachments,
     isLoading, isSent, errors, wordCount, suggestions 
@@ -695,28 +696,28 @@ export default function AdvancedEmailSupport({ setCurrentView }) {
                   icon="💬"
                   label="Live Chat"
                   description="Instant response"
-                  onClick={() => setCurrentView('chat')}
+                  onClick={() => navigate("/customerchat")}
                   color={theme.primary}
                 />
                 <ActionButton
                   icon="📞"
                   label="Call Us"
-                  description="24/7 support"
-                  onClick={() => window.open('tel:+17012734448')}
+                  description="7012734448"
+                  onClick={() => window.open('tel:+91 7012734448')}
                   color={theme.secondary}
                 />
                 <ActionButton
                   icon="📚"
                   label="Knowledge Base"
                   description="Self-help articles"
-                  onClick={() => setCurrentView('faq')}
+                  onClick={() => navigate("/support-faq-options")}
                   color={theme.accent}
                 />
                 <ActionButton
                   icon="🎥"
                   label="Video Guides"
                   description="Step-by-step tutorials"
-                  onClick={() => window.open('https://www.youtube.com/c/YourChannel')}
+                  onClick={() => window.open('https://www.youtube.com/watch?v=LdTuoNHrVqg')}
                   color="#8b5cf6"
                 />
               </div>
@@ -832,13 +833,13 @@ const SuccessScreen = ({ theme, setCurrentView }) => (
         
         <div className="grid grid-cols-2 gap-4">
           <button
-            onClick={() => setCurrentView('chat')}
+            onClick={() => navigate('/customerchat')}
             className="py-3 rounded-xl border-2 font-semibold hover:bg-gray-50 transition-all"
           >
             Live Chat
           </button>
           <button
-            onClick={() => setCurrentView('faq')}
+            onClick={() => navigate('/support-faq-options')}
             className="py-3 rounded-xl border-2 font-semibold hover:bg-gray-50 transition-all"
           >
             Help Center

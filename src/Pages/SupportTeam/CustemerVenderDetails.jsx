@@ -19,6 +19,7 @@ import { Quote } from "lucide-react";
 import NavbarSupport from "../../Components/SupportTeam/NavbarSupport";
 import axiosInstance from "../../Components/utils/axiosInstance";
 import { motion } from "framer-motion";
+import toast from "react-hot-toast";
 
 
 export default function CustomerVendorDetails() {
@@ -169,17 +170,17 @@ const quotes = [
   // Utilities
   function copyToClipboard(text) {
     if (!text || text === "No email") {
-      alert("No email available to copy");
+      toast.loading("No email available to copy");
       return;
     }
     navigator.clipboard.writeText(text).then(() => {
-      alert("Copied to clipboard: " + text);
+      toast.success("Copied to clipboard: " + text);
     });
   }
 
   function downloadCSV(items) {
     if (!items || items.length === 0) {
-      alert("No rows to export");
+      toast.loading("No rows to export");
       return;
     }
     const header = [

@@ -54,6 +54,7 @@ import AdminChatToSupport from './Pages/Admin/AdminChatToSupport.jsx';
 import CustomerChat from './Pages/customer/CustomerChat';
 import SupportProfile from './Pages/SupportTeam/SupportProfile.jsx';
 import EmailSupport from './Pages/SupportTeam/EmailSupport.jsx';
+import { Toaster } from 'react-hot-toast';
 
 
 
@@ -120,6 +121,7 @@ function App() {
         
 
          </Routes>
+         <Toaster position="top-right" />
     </Router>
   );
 }

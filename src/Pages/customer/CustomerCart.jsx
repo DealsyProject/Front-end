@@ -51,27 +51,52 @@ export default function CustomerCart() {
     }
   };
 
-  const updateQuantity = async (cartItemId, newQuantity) => {
+  const increaseQty = async (cartItemId) => {
     try {
-      if (newQuantity <= 0) {
-        await removeItem(cartItemId);
-        return;
+      const response = await axiosInstance.patch(`/Cart/increment/${cartItemId}`);
+      if (response.data.Success) {
+        // Update local state with the returned updated item
+        setCart((prev) =>
+          prev.map((item) =>
+            item.Id === cartItemId
+              ? { ...item, Quantity: response.data.UpdatedItem.Quantity }
+              : item
+          )
+        );
+      } else {
+        alert(response.data.Message || "Failed to increment quantity");
       }
-
-      await axiosInstance.put(`/Cart/${cartItemId}`, { quantity: newQuantity });
-      fetchCart();
     } catch (error) {
-      console.error("❌ Error updating quantity:", error);
-      alert("Failed to update quantity");
+      console.error("❌ Error incrementing quantity:", error);
+      alert("Failed to increment quantity");
     }
   };
 
-  const increaseQty = async (cartItemId, currentQty) => {
-    await updateQuantity(cartItemId, currentQty + 1);
-  };
-
-  const decreaseQty = async (cartItemId, currentQty) => {
-    await updateQuantity(cartItemId, currentQty - 1);
+  const decreaseQty = async (cartItemId) => {
+    try {
+      const response = await axiosInstance.patch(`/Cart/decrement/${cartItemId}`);
+      if (response.data.Success) {
+        if (response.data.UpdatedItem) {
+          // Update local state with the returned updated item
+          setCart((prev) =>
+            prev.map((item) =>
+              item.Id === cartItemId
+                ? { ...item, Quantity: response.data.UpdatedItem.Quantity }
+                : item
+            )
+          );
+        } else {
+          // Item was removed (quantity hit 0)
+          setCart((prev) => prev.filter((i) => i.Id !== cartItemId));
+          window.dispatchEvent(new Event("cartUpdated")); // 🔥 navbar refresh
+        }
+      } else {
+        alert(response.data.Message || "Failed to decrement quantity");
+      }
+    } catch (error) {
+      console.error("❌ Error decrementing quantity:", error);
+      alert("Failed to decrement quantity");
+    }
   };
 
   const removeItem = async (cartItemId) => {
@@ -185,7 +210,7 @@ export default function CustomerCart() {
                         <div className="flex items-center gap-4">
                           <div className="flex items-center border border-gray-300 rounded-lg">
                             <button
-                              onClick={() => decreaseQty(item.Id, item.Quantity)}
+                              onClick={() => decreaseQty(item.Id)}
                               className="px-3 py-2 hover:bg-gray-200 rounded-l-lg"
                               disabled={item.Quantity <= 1}
                             >
@@ -195,7 +220,7 @@ export default function CustomerCart() {
                               {item.Quantity}
                             </span>
                             <button
-                              onClick={() => increaseQty(item.Id, item.Quantity)}
+                              onClick={() => increaseQty(item.Id)}
                               className="px-3 py-2 hover:bg-gray-200 rounded-r-lg"
                             >
                               <FaPlus size={12} />

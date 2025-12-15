@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../../utils/axiosInstance";
-import { Clock, AlertCircle, CheckCircle } from "lucide-react";
+import { Clock, AlertCircle, Package, IndianRupee } from "lucide-react";
 
 export default function CustomerOrders() {
   const [orders, setOrders] = useState([]);
@@ -8,9 +8,11 @@ export default function CustomerOrders() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
-  const [showReturnBox, setShowReturnBox] = useState(null);
-  const [returnReason, setReturnReason] = useState("");
   const [activeTab, setActiveTab] = useState("orders");
+
+  // Return form state
+  const [returningOrderId, setReturningOrderId] = useState(null);
+  const [returnReason, setReturnReason] = useState("");
 
   useEffect(() => {
     fetchOrdersAndReturns();
@@ -19,31 +21,27 @@ export default function CustomerOrders() {
   const fetchOrdersAndReturns = async () => {
     try {
       setLoading(true);
-      
-      // Fetch orders
-      const ordersRes = await axiosInstance.get('/order/customer/orders');
-      let ordersData = ordersRes.data.orders || [];
 
-      // Fetch returns
-      const returnsRes = await axiosInstance.get('/order/return/customer');
-      setReturns(returnsRes.data.returns || []);
+      // Fetch orders (includes return fields if exists)
+      const ordersRes = await axiosInstance.get('/Order/customer/orders');
+      const ordersData = ordersRes.data.orders || [];
 
-      // Loop orders → loop items → fetch product image
+      // Fetch full return requests for Returns tab
+      const returnsRes = await axiosInstance.get('/Order/return/customer');
+      const returnsData = returnsRes.data.returns || [];
+
+      // Enhance orders with product images
       const updatedOrders = await Promise.all(
         ordersData.map(async (order) => {
           const updatedItems = await Promise.all(
-            order.Items.map(async (item) => {
+            (order.Items || []).map(async (item) => {
               try {
                 const prodRes = await axiosInstance.get(`/Product/${item.ProductId}`);
                 const prod = prodRes.data;
-                const primaryImage =
-                  prod.Images?.find((img) => img.IsPrimary) || prod.Images?.[0];
-                return {
-                  ...item,
-                  Image: primaryImage?.ImageUrl || item.Image || null
-                };
+                const primaryImage = prod.Images?.find(img => img.IsPrimary) || prod.Images?.[0];
+                return { ...item, Image: primaryImage?.ImageUrl || null };
               } catch {
-                return { ...item, Image: item.Image || null };
+                return { ...item, Image: null };
               }
             })
           );
@@ -52,105 +50,78 @@ export default function CustomerOrders() {
       );
 
       setOrders(updatedOrders);
+      setReturns(returnsData);
     } catch (error) {
       console.error("Error fetching data:", error);
-      alert("Failed to load orders.");
+      alert("Failed to load orders and returns.");
     } finally {
       setLoading(false);
     }
   };
 
-  const canReturnOrder = (deliveryDate, orderStatus) => {
-    if (orderStatus?.toLowerCase() !== "delivered") return false;
-    if (!deliveryDate) return false;
+  // Return allowed only if: Delivered + within 1 hour + not already returned
+  const canReturnOrder = (order) => {
+    if (!order) return false;
+    if (order.Status?.toLowerCase() !== "delivered") return false;
+    if (order.ConfirmationStatus === "Returned" || order.ConfirmationStatus === "Expired") return false;
+    if (!order.DeliveredDate) return false;
 
-    const deliveredDate = new Date(deliveryDate);
-    const currentDate = new Date();
-    const diffTime = currentDate - deliveredDate;
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 2 && diffDays >= 0;
+    const delivered = new Date(order.DeliveredDate);
+    const now = new Date();
+    const hoursDiff = (now - delivered) / (1000 * 60 * 60);
+    return hoursDiff >= 0 && hoursDiff <= 1;
   };
 
-  const getDaysLeftForReturn = (deliveryDate) => {
-    if (!deliveryDate) return { daysLeft: 0, isFuture: false };
-
-    const deliveredDate = new Date(deliveryDate);
-    const currentDate = new Date();
-    const diffTime = deliveredDate - currentDate;
-
-    if (diffTime > 0) {
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return { daysLeft: diffDays, isFuture: true };
-    }
-
-    const daysPassed = Math.abs(Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-    const daysLeft = 2 - daysPassed;
-    return { daysLeft: daysLeft >= 0 ? daysLeft : 0, isFuture: false };
-  };
-
-  const handleReturn = async (orderId) => {
-    if (!returnReason) {
-      alert("Please select a return reason");
+  const handleReturnRequest = async () => {
+    if (!returnReason.trim()) {
+      alert("Please select a reason for return.");
       return;
     }
 
-    if (!window.confirm("Are you sure you want to request a return?")) return;
+    if (!window.confirm("Submit return request for this order?")) return;
 
     try {
-      const order = orders.find(o => o.Id === orderId);
-      if (!order) {
-        alert("Order not found");
-        return;
-      }
+      const order = orders.find(o => o.Id === returningOrderId);
+      if (!order) throw new Error("Order not found");
 
       const items = order.Items.map(item => ({
-        productId: item.ProductId,
-        quantity: item.Quantity,
-        price: item.Price
-      })) || [];
+        ProductId: item.ProductId,
+        Quantity: item.Quantity,
+        Price: item.Price
+      }));
 
-      const response = await axiosInstance.post("/order/return/create", {
-        orderId,
-        reason: returnReason,
-        items: items
+      await axiosInstance.post("/Order/return/create", {
+        OrderId: returningOrderId,
+        Reason: returnReason,
+        Items: items
       });
 
-      alert(response.data.message || "Return request submitted successfully!");
-
-      setShowReturnBox(null);
+      alert("Return request submitted successfully!");
+      setReturningOrderId(null);
       setReturnReason("");
-      fetchOrdersAndReturns();
+      fetchOrdersAndReturns(); // Refresh to show "Returned" status
     } catch (error) {
-      console.error("Return request error:", error);
-      alert(error.response?.data?.message || "Failed to request return. Please try again.");
+      alert(error.response?.data?.message || "Failed to submit return request.");
     }
   };
 
   const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case "confirmed": return "bg-green-100 text-green-800";
-      case "pending": return "bg-yellow-100 text-yellow-800";
-      case "shipped": return "bg-blue-100 text-blue-800";
-      case "delivered": return "bg-green-100 text-green-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getReturnStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case "confirmed": return "bg-purple-100 text-purple-800";
-      case "pending": return "bg-yellow-100 text-yellow-800";
-      case "rejected": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
+    if (!status) return "bg-gray-100 text-gray-800";
+    const s = status.toLowerCase();
+    if (s === "delivered") return "bg-green-100 text-green-800";
+    if (s === "shipped") return "bg-blue-100 text-blue-800";
+    if (s === "pending") return "bg-yellow-100 text-yellow-800";
+    if (s === "returned") return "bg-red-100 text-red-800";
+    if (s === "confirmed" || s === "expired") return "bg-purple-100 text-purple-800";
+    return "bg-gray-100 text-gray-800";
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-IN", {
-      year: "numeric",
-      month: "short",
+    return new Date(dateString).toLocaleString("en-IN", {
       day: "numeric",
+      month: "short",
+      year: "numeric",
       hour: "2-digit",
       minute: "2-digit"
     });
@@ -161,186 +132,220 @@ export default function CustomerOrders() {
     setShowOrderDetails(true);
   };
 
-  const closeOrderDetails = () => {
-    setShowOrderDetails(false);
-    setSelectedOrder(null);
-  };
-
-  const renderReturnStatus = (order) => {
-    const status = order.Status?.toLowerCase();
-    if (status !== "delivered") return null;
-
-    const canReturn = canReturnOrder(order.DeliveredDate, order.Status);
-    const daysInfo = getDaysLeftForReturn(order.DeliveredDate);
-
-    if (canReturn) {
-      return (
-        <div className="flex items-center gap-2 text-sm text-green-600 mt-2">
-          <Clock size={14} />
-          <span>Return window: {daysInfo.daysLeft} day{daysInfo.daysLeft !== 1 ? 's' : ''} left</span>
-        </div>
-      );
-    } else {
-      return (
-        <div className="flex items-center gap-2 text-sm text-red-600 mt-2">
-          <AlertCircle size={14} />
-          <span>Return window expired</span>
-        </div>
-      );
-    }
-  };
-
-  if (loading) return <p className="text-center py-10">Loading Orders...</p>;
+  if (loading) {
+    return (
+      <div className="text-center py-16">
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-[#586330]"></div>
+        <p className="mt-4 text-xl text-gray-600">Loading your orders...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <h3 className="text-2xl font-semibold mb-6">My Orders & Returns</h3>
+      <h3 className="text-3xl font-bold mb-8">My Orders & Returns</h3>
 
       {/* Tabs */}
-      <div className="flex gap-4 mb-6 border-b border-gray-200">
+      <div className="flex gap-8 mb-8 border-b border-gray-300">
         <button
           onClick={() => setActiveTab("orders")}
-          className={`pb-3 px-2 font-medium transition-colors ${
+          className={`pb-4 px-2 font-semibold text-lg border-b-4 transition-colors ${
             activeTab === "orders"
-              ? "text-blue-600 border-b-2 border-blue-600"
-              : "text-gray-500 hover:text-gray-700"
+              ? "text-[#586330] border-[#586330]"
+              : "text-gray-500 border-transparent hover:text-gray-700"
           }`}
         >
-          Orders
+          Orders ({orders.length})
         </button>
         <button
           onClick={() => setActiveTab("returns")}
-          className={`pb-3 px-2 font-medium transition-colors ${
+          className={`pb-4 px-2 font-semibold text-lg border-b-4 transition-colors ${
             activeTab === "returns"
-              ? "text-blue-600 border-b-2 border-blue-600"
-              : "text-gray-500 hover:text-gray-700"
+              ? "text-[#586330] border-[#586330]"
+              : "text-gray-500 border-transparent hover:text-gray-700"
           }`}
         >
-          Returns ({returns.length})
+          Return Requests ({returns.length})
         </button>
+      </div>
+
+      {/* Return Policy Alert */}
+      <div className="mb-8 p-6 bg-amber-50 border-l-4 border-amber-500 rounded-r-lg">
+        <div className="flex items-start gap-4">
+          <AlertCircle className="text-amber-600 flex-shrink-0" size={28} />
+          <div>
+            <p className="font-bold text-amber-900 text-lg">Return Policy</p>
+            <p className="text-amber-800 mt-2">
+              You can request a return <strong>only within 1 hour</strong> after delivery.
+              Once submitted, the order status will change to <strong>"Returned"</strong>.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Orders Tab */}
       {activeTab === "orders" && (
         <>
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="text-yellow-600 mt-0.5" size={18} />
-              <div>
-                <p className="font-medium text-yellow-800">Return Policy</p>
-                <p className="text-sm text-yellow-700">
-                  Returns are only accepted within 2 days of delivery. Please ensure you initiate the return process before the deadline.
-                </p>
-              </div>
-            </div>
-          </div>
-
           {orders.length === 0 ? (
-            <p className="text-gray-500">You have not placed any orders.</p>
+            <div className="text-center py-20 bg-gray-50 rounded-xl">
+              <Package size={80} className="mx-auto text-gray-400 mb-6" />
+              <p className="text-2xl text-gray-600">No orders yet</p>
+              <p className="text-gray-500 mt-3">Your placed orders will appear here</p>
+            </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-10">
               {orders.map((order) => {
-                const canReturn = canReturnOrder(order.DeliveredDate, order.Status);
+                const isReturnEligible = canReturnOrder(order);
+                const isReturned = order.ConfirmationStatus === "Returned";
+
                 return (
-                  <div key={order.Id} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
-                    <div className="border-b border-gray-200 p-6 flex justify-between">
-                      <div>
-                        <h3 className="font-semibold">Order #{order.Id}</h3>
-                        <p className="text-sm text-gray-500">Placed on {formatDate(order.CreatedOn)}</p>
-                        {order.DeliveredDate && (
-                          <p className="text-sm text-gray-500">Delivered on: {formatDate(order.DeliveredDate)}</p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.Status)}`}>
-                          {order.Status}
-                        </span>
-                        {order.Status?.toLowerCase() === "delivered" && renderReturnStatus(order)}
+                  <div
+                    key={order.Id}
+                    className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden"
+                  >
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-8 border-b border-gray-300">
+                      <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
+                        <div>
+                          <h4 className="text-2xl font-bold text-gray-900">Order #{order.Id}</h4>
+                          <div className="mt-4 space-y-2 text-gray-600">
+                            <p>Placed: {formatDate(order.CreatedOn)}</p>
+                            {order.DeliveredDate && (
+                              <p>Delivered: {formatDate(order.DeliveredDate)}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-3xl font-bold text-[#586330]">
+                            ₹{order.TotalAmount?.toFixed(2)}
+                          </p>
+                          <div className="mt-4 flex flex-wrap gap-3 justify-end">
+                            <span className={`px-6 py-2 rounded-full font-medium ${getStatusColor(order.OrderStatus)}`}>
+                              {order.OrderStatus || order.Status}
+                            </span>
+                            <span className={`px-6 py-2 rounded-full font-medium ${getStatusColor(order.ConfirmationStatus)}`}>
+                              {order.ConfirmationStatus}
+                            </span>
+                          </div>
+
+                          {/* Return Window Indicator */}
+                          {order.Status?.toLowerCase() === "delivered" && (
+                            <div className="mt-4 text-lg">
+                              {isReturnEligible ? (
+                                <div className="flex items-center justify-end gap-2 text-green-600 font-bold">
+                                  <Clock size={20} />
+                                  Return window open
+                                </div>
+                              ) : isReturned ? (
+                                <div className="flex items-center justify-end gap-2 text-red-600 font-bold">
+                                  <AlertCircle size={20} />
+                                  Return Requested
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end gap-2 text-gray-600">
+                                  <AlertCircle size={20} />
+                                  Return window expired
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="p-6">
-                      {order.Items?.slice(0, 3).map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-4 mb-3">
-                          <img
-                            src={item.Image}
-                            alt=""
-                            className="w-16 h-16 rounded object-cover border border-gray-200"
-                            onError={(e) => {
-                              e.target.src = "https://cdn-icons-png.flaticon.com/512/847/847969.png";
-                            }}
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium">{item.ProductName}</p>
-                            <p className="text-sm text-gray-500">Qty: {item.Quantity} × ₹{item.Price.toFixed(2)}</p>
+                    {/* Items & Actions */}
+                    <div className="p-8">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        {(order.Items || []).slice(0, 3).map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg">
+                            <img
+                              src={item.Image || "https://cdn-icons-png.flaticon.com/512/847/847969.png"}
+                              alt={item.ProductName}
+                              className="w-20 h-20 rounded object-cover border"
+                              onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/847/847969.png"}
+                            />
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-900">{item.ProductName}</p>
+                              <p className="text-sm text-gray-600 mt-1">
+                                Qty: {item.Quantity} × ₹{item.Price?.toFixed(2)}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
 
-                      <div className="flex justify-between items-center mt-4">
+                      <div className="flex justify-between items-center">
                         <button
                           onClick={() => viewOrderDetails(order)}
-                          className="text-[#586330] hover:underline text-sm font-medium"
+                          className="px-6 py-3 bg-[#586330] text-white rounded-lg hover:bg-[#586330]/90 font-medium transition flex items-center gap-2"
                         >
-                          View Details →
+                          View Full Details
                         </button>
 
-                        {order.Status?.toLowerCase() === "delivered" && (
-                          <div>
-                            {canReturn ? (
-                              <div>
-                                <button
-                                  onClick={() => setShowReturnBox(showReturnBox === order.Id ? null : order.Id)}
-                                  className="px-4 py-2 text-sm font-medium bg-red-500 text-white rounded hover:bg-red-600 transition"
+                        {/* Return Form */}
+                        {isReturnEligible && !isReturned && (
+                          <div className="max-w-md">
+                            {returningOrderId === order.Id ? (
+                              <div className="bg-red-50 border border-red-200 p-6 rounded-xl">
+                                <h4 className="font-bold text-red-900 mb-4">Request Return</h4>
+                                <select
+                                  value={returnReason}
+                                  onChange={(e) => setReturnReason(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-lg px-4 py-3 mb-4 focus:ring-2 focus:ring-red-500 focus:border-transparent"
                                 >
-                                  {showReturnBox === order.Id ? "Cancel Return" : "Return Order"}
-                                </button>
+                                  <option value="">-- Select Reason --</option>
+                                  <option value="Damaged product">Damaged product</option>
+                                  <option value="Wrong item received">Wrong item received</option>
+                                  <option value="Defective item">Defective item</option>
+                                  <option value="Does not match description">Does not match description</option>
+                                  <option value="Changed my mind">Changed my mind</option>
+                                  <option value="Other">Other</option>
+                                </select>
 
-                                {showReturnBox === order.Id && (
-                                  <div className="mt-3 bg-gray-100 p-4 rounded-lg">
-                                    <label className="block text-sm font-medium mb-2">Select Return Reason</label>
-                                    <select
-                                      value={returnReason}
-                                      onChange={(e) => setReturnReason(e.target.value)}
-                                      className="w-full border p-2 rounded"
-                                    >
-                                      <option value="">-- Choose a reason --</option>
-                                      <option value="Item arrived damaged">Item arrived damaged</option>
-                                      <option value="Wrong item received">Wrong item received</option>
-                                      <option value="Product defective">Product defective</option>
-                                      <option value="Changed my mind">Changed my mind</option>
-                                    </select>
-
-                                    <div className="mt-3 flex gap-2">
-                                      <button
-                                        onClick={() => handleReturn(order.Id)}
-                                        disabled={!returnReason}
-                                        className="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700 disabled:opacity-50"
-                                      >
-                                        Confirm Return
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          setShowReturnBox(null);
-                                          setReturnReason("");
-                                        }}
-                                        className="flex-1 bg-gray-300 text-gray-800 py-2 rounded hover:bg-gray-400"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
+                                <div className="flex gap-3">
+                                  <button
+                                    onClick={handleReturnRequest}
+                                    disabled={!returnReason}
+                                    className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium transition"
+                                  >
+                                    Submit Return
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setReturningOrderId(null);
+                                      setReturnReason("");
+                                    }}
+                                    className="flex-1 bg-gray-300 text-gray-800 py-3 rounded-lg hover:bg-gray-400 font-medium transition"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               <button
-                                disabled
-                                className="px-4 py-2 text-sm font-medium bg-gray-300 text-gray-500 rounded cursor-not-allowed"
-                                title="Return window expired (2 days after delivery)"
+                                onClick={() => setReturningOrderId(order.Id)}
+                                className="px-8 py-4 bg-red-600 text-white rounded-xl hover:bg-red-700 font-bold text-lg transition shadow-lg"
                               >
-                                Return Expired
+                                Return This Order
                               </button>
                             )}
+                          </div>
+                        )}
+
+                        {/* Already Returned */}
+                        {isReturned && (
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-red-600">Return Requested</p>
+                            <p className="text-gray-600 mt-2">Admin is reviewing your request</p>
+                          </div>
+                        )}
+
+                        {/* Expired */}
+                        {!isReturnEligible && !isReturned && order.Status?.toLowerCase() === "delivered" && (
+                          <div className="text-right">
+                            <p className="text-xl font-semibold text-gray-500">Return Window Closed</p>
+                            <p className="text-gray-500">More than 1 hour since delivery</p>
                           </div>
                         )}
                       </div>
@@ -355,139 +360,178 @@ export default function CustomerOrders() {
 
       {/* Returns Tab */}
       {activeTab === "returns" && (
-        <>
+        <div>
           {returns.length === 0 ? (
-            <p className="text-gray-500">You have no return requests yet.</p>
+            <div className="text-center py-20 bg-gray-50 rounded-xl">
+              <Package size={80} className="mx-auto text-gray-400 mb-6" />
+              <p className="text-2xl text-gray-600">No return requests</p>
+              <p className="text-gray-500 mt-3">Your return requests will appear here</p>
+            </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {returns.map((ret) => (
-                <div key={ret.ReturnId} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
-                  <div className="border-b border-gray-200 p-6 flex justify-between">
+                <div key={ret.ReturnId} className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
+                  <div className="flex justify-between items-start mb-6">
                     <div>
-                      <h3 className="font-semibold">{ret.OrderNumber}</h3>
-                      <p className="text-sm text-gray-500">Return Date: {formatDate(ret.ReturnDate)}</p>
+                      <h4 className="text-2xl font-bold">
+                        Return Request #{ret.ReturnId} → {ret.OrderNumber}
+                      </h4>
+                      <p className="text-gray-600 mt-2">Requested on: {formatDate(ret.ReturnDate)}</p>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getReturnStatusColor(ret.Status)}`}>
+                    <div className="text-right">
+                      <span className={`px-6 py-3 rounded-full font-bold text-lg ${getStatusColor(ret.Status)}`}>
                         {ret.Status}
                       </span>
-                      {ret.RefundStatus && (
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${ret.RefundStatus?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                          Refund: {ret.RefundStatus}
-                        </span>
-                      )}
+                      <p className="mt-4 text-3xl font-bold text-red-600">
+                        ₹{ret.RefundAmount?.toFixed(2)}
+                      </p>
+                      <p className="text-gray-600">Refund Amount</p>
                     </div>
                   </div>
 
-                  <div className="p-6">
-                    <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                      <p className="text-sm text-gray-700">
-                        <span className="font-medium">Reason:</span> {ret.Reason}
-                      </p>
-                      <p className="text-sm text-gray-700 mt-1">
-                        <span className="font-medium">Refund Amount:</span> ₹{ret.RefundAmount?.toFixed(2)}
-                      </p>
-                    </div>
-
-                    {ret.TrackingId && (
-                      <div className="p-3 bg-purple-50 rounded-lg">
-                        <p className="text-sm font-medium text-purple-900">Shipping Information:</p>
-                        <p className="text-sm text-gray-700">Carrier: {ret.CarrierName}</p>
-                        <p className="text-sm text-gray-700">Tracking: {ret.TrackingId}</p>
-                      </div>
-                    )}
+                  <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-lg mb-6">
+                    <p className="font-semibold text-red-900">Reason:</p>
+                    <p className="text-lg italic mt-2">"{ret.Reason}"</p>
                   </div>
+
+                  <div>
+                    <h5 className="font-bold text-xl mb-4">Returned Items</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {ret.Items.map((item, i) => (
+                        <div key={i} className="bg-gray-50 p-4 rounded-lg border">
+                          <p className="font-semibold">{item.ProductName}</p>
+                          <p className="text-gray-600 mt-2">
+                            Qty: {item.Quantity} × ₹{item.Price.toFixed(2)}
+                          </p>
+                          <p className="text-right font-bold text-xl mt-3">
+                            ₹{(item.Quantity * item.Price).toFixed(2)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {ret.TrackingId && (
+                    <div className="mt-8 bg-purple-50 p-6 rounded-xl">
+                      <h5 className="font-bold text-xl mb-3">Pickup Scheduled</h5>
+                      <p><strong>Carrier:</strong> {ret.CarrierName}</p>
+                      <p><strong>Tracking ID:</strong> <span className="font-mono bg-white px-3 py-1 rounded">{ret.TrackingId}</span></p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Order Details Modal */}
       {showOrderDetails && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-lg p-6">
-            <div className="border-b border-gray-200 pb-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Order Details #{selectedOrder.Id}</h2>
-              <button
-                onClick={closeOrderDetails}
-                className="text-gray-400 hover:text-gray-600 transition"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="pt-6">
-              <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-4">
-                <div><span className="font-medium">Order Date:</span> {formatDate(selectedOrder.CreatedOn)}</div>
-                {selectedOrder.DeliveredDate && (
-                  <div><span className="font-medium">Delivery Date:</span> {formatDate(selectedOrder.DeliveredDate)}</div>
-                )}
-                <div>
-                  <span className="font-medium">Status:</span>
-                  <span className={`ml-1 px-2 py-1 rounded-full text-xs ${getStatusColor(selectedOrder.Status)}`}>
-                    {selectedOrder.Status}
-                  </span>
-                </div>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-8 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-bold">Order Details #{selectedOrder.Id}</h2>
+                <button
+                  onClick={() => setShowOrderDetails(false)}
+                  className="text-4xl text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
               </div>
             </div>
 
-            <div className="pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Items</h3>
-              <div className="space-y-4">
-                {selectedOrder.Items?.map((item, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                    <img
-                      src={item.Image}
-                      alt={item.ProductName}
-                      className="w-20 h-20 object-cover rounded border"
-                      onError={(e) => {
-                        e.target.src = "https://cdn-icons-png.flaticon.com/512/847/847969.png";
-                      }}
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{item.ProductName}</h4>
-                      <p className="text-sm text-gray-600">Quantity: {item.Quantity}</p>
-                      <p className="text-sm text-gray-600">Price: ₹{item.Price.toFixed(2)} each</p>
+            <div className="p-8 space-y-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                <div className="bg-gray-50 p-4 rounded-xl">
+                  <p className="text-gray-600">Order Date</p>
+                  <p className="text-xl font-bold">{formatDate(selectedOrder.CreatedOn)}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-xl">
+                  <p className="text-gray-600">Status</p>
+                  <span className={`inline-block px-6 py-2 rounded-full font-bold mt-2 ${getStatusColor(selectedOrder.OrderStatus)}`}>
+                    {selectedOrder.OrderStatus || selectedOrder.Status}
+                  </span>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-xl">
+                  <p className="text-gray-600">Confirmation</p>
+                  <span className={`inline-block px-6 py-2 rounded-full font-bold mt-2 ${getStatusColor(selectedOrder.ConfirmationStatus)}`}>
+                    {selectedOrder.ConfirmationStatus}
+                  </span>
+                </div>
+                <div className="bg-green-50 p-4 rounded-xl">
+                  <p className="text-gray-600">Total Amount</p>
+                  <p className="text-3xl font-bold text-green-600">
+                    ₹{selectedOrder.TotalAmount?.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-2xl font-bold mb-6">Items</h3>
+                <div className="space-y-6">
+                  {selectedOrder.Items?.map((item, i) => (
+                    <div key={i} className="flex gap-6 p-6 bg-gray-50 rounded-xl">
+                      <img
+                        src={item.Image || "https://cdn-icons-png.flaticon.com/512/847/847969.png"}
+                        alt={item.ProductName}
+                        className="w-32 h-32 rounded-xl object-cover border"
+                        onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/847/847969.png"}
+                      />
+                      <div className="flex-1">
+                        <h4 className="text-xl font-bold">{item.ProductName}</h4>
+                        <div className="mt-4 grid grid-cols-3 gap-4 text-lg">
+                          <div>
+                            <p className="text-gray-600">Quantity</p>
+                            <p className="font-bold">{item.Quantity}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Unit Price</p>
+                            <p className="font-bold">₹{item.Price?.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Total</p>
+                            <p className="font-bold text-2xl text-[#586330]">
+                              ₹{(item.Quantity * item.Price).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <p className="font-semibold text-gray-900 text-right">
-                      ₹{(item.Quantity * item.Price).toFixed(2)}
-                    </p>
+                  ))}
+                </div>
+              </div>
+
+              {/* Show Return Info if exists */}
+              {selectedOrder.ReturnId && (
+                <div className="bg-red-50 p-6 rounded-xl border border-red-200">
+                  <h3 className="text-2xl font-bold text-red-900 mb-4">Return Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-gray-700">Return Status:</p>
+                      <span className={`inline-block px-4 py-2 rounded-full font-bold mt-2 ${getStatusColor(selectedOrder.Status)}`}>
+                        {selectedOrder.Status}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-gray-700">Refund Status:</p>
+                      <span className="inline-block px-4 py-2 rounded-full font-bold mt-2 bg-yellow-100 text-yellow-800">
+                        {selectedOrder.RefundStatus || "Pending"}
+                      </span>
+                    </div>
+                    {selectedOrder.Reason && (
+                      <div className="col-span-2">
+                        <p className="text-gray-700">Reason:</p>
+                        <p className="mt-2 italic text-red-800">"{selectedOrder.Reason}"</p>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-8 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal:</span>
-                  <span className="text-gray-900">
-                    ₹{selectedOrder.Items.reduce((sum, i) => sum + (i.Price * i.Quantity), 0).toFixed(2)}
-                  </span>
                 </div>
-                <div className="flex justify-between font-semibold text-lg border-t border-gray-200 pt-2">
-                  <span>Total:</span>
-                  <span className="text-[#586330]">₹{selectedOrder.TotalAmount?.toFixed(2) || "0.00"}</span>
-                </div>
-              </div>
-            </div>
+              )}
 
-            <div className="pt-8 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Shipping Information</h3>
-              <div className="bg-gray-50 p-4 rounded-lg text-gray-900">
-                {selectedOrder.ShippingAddress || "No shipping address provided"}
-              </div>
-            </div>
-
-            <div className="pt-8 border-t border-gray-200">
               <button
-                onClick={closeOrderDetails}
-                className="w-full bg-[#586330] text-white py-3 rounded-md hover:bg-[#586330]/90 transition"
+                onClick={() => setShowOrderDetails(false)}
+                className="w-full py-4 bg-[#586330] text-white text-xl font-bold rounded-xl hover:bg-[#586330]/90 transition"
               >
                 Close
               </button>

@@ -1,1222 +1,675 @@
 import React, { useState, useEffect } from "react";
-import { Search, Trash2, Eye, DollarSign, CheckCircle, Clock, Mail, ExternalLink, Truck, Package, User, Phone, MapPin, Calendar, Info, X, Percent } from 'lucide-react';
-import Navbar from '../../Components/Admin/Navbar'
+import axiosInstance from "../../Components/utils/axiosInstance";
+import { 
+  Package, Truck, DollarSign, Eye, IndianRupee, Calendar, 
+  AlertCircle, CheckCircle, RefreshCw, CreditCard 
+} from "lucide-react";
 
 export default function ProductReturnPage() {
-  const [returns, setReturns] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [viewItem, setViewItem] = useState(null);
-  const [activeTab, setActiveTab] = useState("details");
-  const [toast, setToast] = useState("");
-  const [refundAmount, setRefundAmount] = useState("");
-  const [editingReturn, setEditingReturn] = useState(null);
-  const [showShippingForm, setShowShippingForm] = useState(false);
-  const [shippingInfo, setShippingInfo] = useState({
-    trackingId: "", carrier: "", shippingMethod: "standard", shippingCost: "",
-    estimatedDelivery: "", returnReason: "", notes: ""
-  });
-
-  const COMMISSION_RATE = 0.20; // 20% commission to admin
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showConfirmedModal, setShowConfirmedModal] = useState(false);
+  const [processingRefund, setProcessingRefund] = useState(false);
+  const [processingVendorPayment, setProcessingVendorPayment] = useState(false);
 
   useEffect(() => {
-    fetchReturns();
-    // Check for expired returns every minute
-    const interval = setInterval(checkExpiredReturns, 60000);
-    return () => clearInterval(interval);
+    fetchDeliveredOrders();
   }, []);
 
-  const checkExpiredReturns = () => {
-    setReturns(prevReturns => {
-      return prevReturns.map(returnItem => {
-        const returnDate = new Date(returnItem.returnRequestDate);
-        const expiryDate = new Date(returnDate);
-        expiryDate.setDate(expiryDate.getDate() + 2); // 2-day return window
-        
-        if (new Date() > expiryDate && returnItem.status === "Pending") {
-          return {
-            ...returnItem,
-            status: "Confirmed",
-            isReturnExpired: true,
-            expiryDate: expiryDate.toISOString().split('T')[0]
-          };
-        }
-        return returnItem;
-      });
-    });
-  };
-
-  const fetchReturns = async () => {
+  const fetchDeliveredOrders = async () => {
     try {
       setLoading(true);
-      const dummyReturns = getDummyReturns();
-      // Initialize with expiry check and commission calculations
-      const returnsWithExpiry = dummyReturns.map(returnItem => {
-        const returnDate = new Date(returnItem.returnRequestDate);
-        const expiryDate = new Date(returnDate);
-        expiryDate.setDate(expiryDate.getDate() + 2);
-        
-        const isExpired = new Date() > expiryDate && returnItem.status === "Pending";
-        
-        // Calculate commission and vendor payment amounts
-        const commissionAmount = returnItem.purchasePrice * COMMISSION_RATE;
-        const vendorAmount = returnItem.purchasePrice * (1 - COMMISSION_RATE);
-        
-        return {
-          ...returnItem,
-          isReturnExpired: isExpired,
-          expiryDate: expiryDate.toISOString().split('T')[0],
-          status: isExpired ? "Confirmed" : returnItem.status,
-          vendorPaymentStatus: returnItem.vendorPaymentStatus || "Pending",
-          commissionAmount,
-          vendorAmount,
-          adminAmount: commissionAmount
-        };
-      });
-      setReturns(returnsWithExpiry);
+      const res = await axiosInstance.get("/Order/admin/delivered-orders");
+      console.log("Fetched orders:", res.data.orders); // Debug log
+      setOrders(res.data.orders || []);
     } catch (error) {
-      console.error("Error fetching returns:", error);
-      setReturns(getDummyReturns());
+      console.error("Error fetching delivered orders:", error);
+      alert("Failed to load delivered orders. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const getDummyReturns = () => [
-    {
-      id: 1,
-      orderId: "ORD-2025-001",
-      product: "Wireless Keyboard",
-      customer: "John Doe",
-      email: "john@example.com",
-      reason: "Defective",
-      returnDate: new Date().toISOString().split('T')[0],
-      orderDate: "2025-10-20",
-      deliveryDate: "2025-10-27",
-      purchasePrice: 49.99,
-      refundAmount: 0,
-      status: "Pending",
-      quantity: 1,
-      condition: "Used",
-      description: "Keys not working properly",
-      customerId: "CUST-001",
-      productId: "PROD-001",
-      returnRequestDate: "2025-10-28",
-      isWithinReturnWindow: true,
-      vendor: {
-        id: "VEND-001",
-        name: "TechGadgets Inc.",
-        email: "vendor@techgadgets.com",
-        phone: "+1 (555) 123-4567",
-        address: "123 Tech Street, San Francisco, CA 94107",
-        contactPerson: "Michael Chen",
-        rating: 4.8,
-        totalSales: 1245,
-        paymentStatus: "Pending",
-        bankDetails: {
-          accountName: "TechGadgets Inc.",
-          accountNumber: "XXXX-XXXX-7890",
-          bankName: "Chase Bank",
-          routingNumber: "021000021"
-        }
-      },
-      shippingStatus: "Not Initiated",
-      vendorPaymentStatus: "Pending"
-    },
-    {
-      id: 2,
-      orderId: "ORD-2025-002",
-      product: "Gaming Mouse Pad",
-      customer: "Sarah Lee",
-      email: "sarah@example.com",
-      reason: "Wrong Item",
-      returnDate: "2025-10-27",
-      orderDate: "2025-10-18",
-      deliveryDate: "2025-10-25",
-      purchasePrice: 24.99,
-      refundAmount: 24.99,
-      status: "Refunded",
-      quantity: 1,
-      condition: "Unopened",
-      description: "Received wrong color",
-      customerId: "CUST-002",
-      productId: "PROD-002",
-      returnRequestDate: "2025-10-26",
-      isWithinReturnWindow: true,
-      vendor: {
-        id: "VEND-002",
-        name: "Gaming Gear Pro",
-        email: "sales@gaminggearpro.com",
-        phone: "+1 (555) 987-6543",
-        address: "456 Gaming Ave, Los Angeles, CA 90001",
-        contactPerson: "Alex Rodriguez",
-        rating: 4.6,
-        totalSales: 892,
-        paymentStatus: "Paid",
-        bankDetails: {
-          accountName: "Gaming Gear Pro",
-          accountNumber: "XXXX-XXXX-4567",
-          bankName: "Bank of America",
-          routingNumber: "026009593"
-        }
-      },
-      shippingStatus: "Returned to Vendor",
-      shippingInfo: {
-        trackingId: "TRK789012345",
-        carrier: "FedEx",
-        shippingMethod: "express",
-        shippingCost: 8.99,
-        estimatedDelivery: "2025-11-05",
-        returnReason: "Wrong color received",
-        notes: "Customer requested black, received blue"
-      },
-      vendorPaymentStatus: "Paid"
-    },
-    {
-      id: 3,
-      orderId: "ORD-2025-003",
-      product: "Bluetooth Headphones",
-      customer: "Robert Wilson",
-      email: "robert@example.com",
-      reason: "Damaged",
-      returnDate: "2025-10-20",
-      orderDate: "2025-10-15",
-      deliveryDate: "2025-10-18",
-      purchasePrice: 89.99,
-      refundAmount: 0,
-      status: "Confirmed", // Expired return
-      quantity: 1,
-      condition: "Used",
-      description: "Damaged during delivery",
-      customerId: "CUST-003",
-      productId: "PROD-003",
-      returnRequestDate: "2025-10-19",
-      isWithinReturnWindow: false,
-      isReturnExpired: true,
-      expiryDate: "2025-10-21",
-      vendor: {
-        id: "VEND-003",
-        name: "AudioTech Solutions",
-        email: "support@audiotech.com",
-        phone: "+1 (555) 456-7890",
-        address: "789 Sound Ave, New York, NY 10001",
-        contactPerson: "David Miller",
-        rating: 4.9,
-        totalSales: 2100,
-        paymentStatus: "Pending",
-        bankDetails: {
-          accountName: "AudioTech Solutions",
-          accountNumber: "XXXX-XXXX-1234",
-          bankName: "Wells Fargo",
-          routingNumber: "121000248"
-        }
-      },
-      shippingStatus: "Not Eligible",
-      vendorPaymentStatus: "Pending"
-    }
-  ];
+  
+ const handleProcessRefund = async () => {
+  if (!selectedOrder) return;
+  
+  // DEBUG: Log everything
+  console.log("=== DEBUG: Refund Data ===");
+  console.log("1. selectedOrder.Reason:", selectedOrder.Reason);
+  console.log("2. typeof selectedOrder.Reason:", typeof selectedOrder.Reason);
+  console.log("3. Is Reason truthy?:", !!selectedOrder.Reason);
+  console.log("4. Is Reason empty string?:", selectedOrder.Reason === "");
+  console.log("5. Full selectedOrder:", selectedOrder);
+  
+  // Check if we have a valid reason
+  if (!selectedOrder.Reason || selectedOrder.Reason.trim() === "") {
+    alert(`Cannot process refund: Reason is required. Current reason: "${selectedOrder.Reason}"`);
+    return;
+  }
+  
+  if (!window.confirm(`Process refund of ₹${selectedOrder.RefundAmount?.toFixed(2) || selectedOrder.TotalAmount?.toFixed(2)} to customer for reason: "${selectedOrder.Reason}"?`)) return;
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Refunded': return 'text-green-700 bg-green-100 border border-green-200';
-      case 'Pending': return 'text-yellow-700 bg-yellow-100 border border-yellow-200';
-      case 'Confirmed': return 'text-purple-700 bg-purple-100 border border-purple-200';
-      case 'Partial Refund': return 'text-blue-700 bg-blue-100 border border-blue-200';
-      case 'Rejected': return 'text-red-700 bg-red-100 border border-red-200';
-      case 'Expired': return 'text-gray-700 bg-gray-100 border border-gray-200';
-      default: return 'text-gray-700 bg-gray-100 border border-gray-200';
-    }
-  };
-
-  const getShippingStatusColor = (status) => {
-    switch (status) {
-      case 'Returned to Vendor': return 'text-green-700 bg-green-100 border border-green-200';
-      case 'In Transit': return 'text-blue-700 bg-blue-100 border border-blue-200';
-      case 'Pickup Scheduled': return 'text-yellow-700 bg-yellow-100 border border-yellow-200';
-      case 'Not Initiated': return 'text-gray-700 bg-gray-100 border border-gray-200';
-      case 'Not Eligible': return 'text-red-700 bg-red-100 border border-red-200';
-      default: return 'text-gray-700 bg-gray-100 border border-gray-200';
-    }
-  };
-
-  const getReasonColor = (reason) => {
-    switch (reason) {
-      case 'Defective': return 'text-red-700 bg-red-100 border border-red-200';
-      case 'Damaged': return 'text-yellow-700 bg-yellow-100 border border-yellow-200';
-      case 'Wrong Item': return 'text-blue-700 bg-blue-100 border border-blue-200';
-      default: return 'text-gray-700 bg-gray-100 border border-gray-200';
-    }
-  };
-
-  const handleRefundUpdate = (id) => {
-    if (!refundAmount || isNaN(refundAmount) || refundAmount < 0) {
-      showToast("⚠️ Please enter a valid refund amount!");
-      return;
-    }
-    const amount = parseFloat(refundAmount);
-    const returnItem = returns.find(r => r.id === id);
-    let status = "Partial Refund";
-    if (amount === 0) {
-      status = "Rejected";
-    } else if (amount >= returnItem.purchasePrice) {
-      status = "Refunded";
-    }
+  try {
+    setProcessingRefund(true);
     
-    setReturns(returns.map(item => {
-      if (item.id === id) {
-        return { ...item, refundAmount: amount, status: status };
-      }
-      return item;
-    }));
-    showToast(`✅ Refund amount updated to ₹${refundAmount}`);
-    setRefundAmount("");
-    setEditingReturn(null);
-  };
-
-  const handleVendorPayment = (id) => {
-    const returnItem = returns.find(r => r.id === id);
-    const commissionAmount = returnItem.purchasePrice * COMMISSION_RATE;
-    const vendorAmount = returnItem.purchasePrice * (1 - COMMISSION_RATE);
-    
-    setReturns(returns.map(item => {
-      if (item.id === id) {
-        return {
-          ...item,
-          vendorPaymentStatus: "Paid",
-          vendor: {
-            ...item.vendor,
-            paymentStatus: "Paid"
-          },
-          commissionAmount,
-          vendorAmount,
-          adminAmount: commissionAmount,
-          paymentDate: new Date().toISOString().split('T')[0]
-        };
-      }
-      return item;
-    }));
-    showToast(`✅ Vendor payment processed! Admin: ₹${commissionAmount.toFixed(2)} | Vendor: ₹${vendorAmount.toFixed(2)}`);
-  };
-
-  const handleShippingSubmit = (e) => {
-    e.preventDefault();
-    const updatedReturn = {
-      ...viewItem,
-      shippingStatus: "In Transit",
-      shippingInfo: shippingInfo
+    // Prepare refund data - ensure all fields are present
+    const refundData = {
+      ReturnId: selectedOrder.Id, // Using OrderId as ReturnId
+      PaymentId: selectedOrder.PaymentId || "", // Ensure string
+      RefundAmount: selectedOrder.RefundAmount || selectedOrder.TotalAmount || 0,
+      Reason: selectedOrder.Reason || "Customer return request" // Ensure this is not empty
     };
-    setReturns(returns.map(r => r.id === viewItem.id ? updatedReturn : r));
-    setViewItem(updatedReturn);
-    setShowShippingForm(false);
-    setActiveTab("details");
-    setShippingInfo({
-      trackingId: "", carrier: "", shippingMethod: "standard", shippingCost: "",
-      estimatedDelivery: "", returnReason: "", notes: ""
+    
+    console.log("=== SENDING REFUND DATA ===");
+    console.log("Refund data to send:", refundData);
+    console.log("Reason being sent:", refundData.Reason);
+    console.log("Reason length:", refundData.Reason.length);
+    
+    const response = await axiosInstance.post("/payment/refund", refundData);
+    
+    console.log("=== REFUND RESPONSE ===");
+    console.log("Response:", response);
+    
+    if (response.data.success) {
+      alert(`Refund processed successfully! Razorpay Refund ID: ${response.data.razorpayRefundId}`);
+      fetchDeliveredOrders();
+      setShowReturnModal(false);
+    } else {
+      alert(response.data.message || "Failed to process refund.");
+    }
+  } catch (error) {
+    console.error("=== REFUND ERROR DETAILS ===");
+    console.error("Full error:", error);
+    console.error("Error response data:", error.response?.data);
+    console.error("Error status:", error.response?.status);
+    console.error("Error headers:", error.response?.headers);
+    
+    if (error.response?.data?.errors) {
+      alert(`Validation errors: ${JSON.stringify(error.response.data.errors, null, 2)}`);
+    } else {
+      alert(error.response?.data?.message || error.message || "Failed to process refund.");
+    }
+  } finally {
+    setProcessingRefund(false);
+  }
+};
+// Also fix the vendor payment function:
+const handlePayVendor = async (orderId) => {
+  if (!window.confirm("Confirm payment to vendor (80% of order amount)?")) return;
+
+  try {
+    setProcessingVendorPayment(true);
+    // Send OrderId as per ProcessVendorPaymentDto
+    await axiosInstance.post("/payment/vendor-payment", { OrderId: orderId });
+    alert("Vendor payment processed successfully!");
+    fetchDeliveredOrders();
+  } catch (error) {
+    console.error("Vendor payment error:", error);
+    alert(error.response?.data?.message || "Failed to pay vendor.");
+  } finally {
+    setProcessingVendorPayment(false);
+  }
+};
+
+const openReturnDetails = (order) => {
+  console.log("Opening return details for order:", order);
+  console.log("Order Reason property:", order.Reason);
+  console.log("All properties of order:", Object.keys(order));
+  console.log("Full order object:", JSON.stringify(order, null, 2));
+  
+  setSelectedOrder(order);
+  setShowReturnModal(true);
+};
+
+  const openConfirmedDetails = (order) => {
+    setSelectedOrder(order);
+    setShowConfirmedModal(true);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
-    showToast("✅ Return shipping initiated successfully!");
   };
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2500);
-  };
-
-  const handleSendEmail = (customerEmail, customerName) => {
-    const subject = encodeURIComponent(`Regarding Your Return Request`);
-    const body = encodeURIComponent(`Dear ${customerName},\n\nWe are processing your return request.\n\nBest regards,\nAdmin Team`);
-    window.open(`mailto:${customerEmail}?subject=${subject}&body=${body}`, '_blank');
-  };
-
-  const filteredReturns = returns.filter((r) => {
-    const matchesSearch = r.product.toLowerCase().includes(search.toLowerCase()) ||
-      r.customer.toLowerCase().includes(search.toLowerCase()) ||
-      r.orderId.toLowerCase().includes(search.toLowerCase()) ||
-      r.email.toLowerCase().includes(search.toLowerCase());
-    const matchesReasonFilter = filter === "All" || r.reason === filter;
-    const matchesStatusFilter = statusFilter === "All" || r.status === statusFilter;
-    return matchesSearch && matchesReasonFilter && matchesStatusFilter;
-  });
-
-  const totalRefunds = returns.reduce((sum, r) => sum + r.refundAmount, 0);
-  const pendingReturns = returns.filter(r => r.status === "Pending").length;
-  const pendingShipping = returns.filter(r => r.shippingStatus === "Pickup Scheduled" || r.shippingStatus === "Not Initiated").length;
-  const confirmedReturns = returns.filter(r => r.status === "Confirmed").length;
-
-  const formatDate = (dateString) => new Date(dateString).toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  });
-
-  const calculateDaysSinceDelivery = (deliveryDate) => {
-    const delivery = new Date(deliveryDate);
-    const today = new Date();
-    const diffTime = today - delivery;
-    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  };
-
-  const calculateDaysUntilExpiry = (returnRequestDate) => {
-    const requestDate = new Date(returnRequestDate);
-    const expiryDate = new Date(requestDate);
-    expiryDate.setDate(expiryDate.getDate() + 2);
-    const today = new Date();
-    const diffTime = expiryDate - today;
-    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return days > 0 ? days : 0;
+  const getStatusBadge = (status) => {
+    if (!status) return "bg-gray-100 text-gray-800";
+    const s = status.toLowerCase();
+    if (s === "delivered") return "bg-green-100 text-green-800";
+    if (s === "returned") return "bg-red-100 text-red-800";
+    if (s === "confirmed") return "bg-blue-100 text-blue-800";
+    if (s === "expired") return "bg-purple-100 text-purple-800";
+    if (s === "pending") return "bg-yellow-100 text-yellow-800";
+    if (s === "shipped") return "bg-indigo-100 text-indigo-800";
+    return "bg-gray-100 text-gray-800";
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading return requests...</p>
-        </div>
+      <div className="p-12 text-center">
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-[#586330]"></div>
+        <p className="mt-6 text-xl text-gray-600">Loading delivered orders...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      
-      <div className="p-6 mt-24">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Product Returns Management</h1>
-          <p className="text-gray-600 mt-2">Manage customer returns within 2-day return window</p>
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-10">
+        <h2 className="text-4xl font-bold text-gray-900">Delivered Orders Management</h2>
+        <button
+          onClick={fetchDeliveredOrders}
+          className="px-6 py-3 bg-[#586330] text-white rounded-lg hover:bg-[#586330]/90 font-medium transition flex items-center gap-2"
+        >
+          <RefreshCw size={18} />
+          Refresh
+        </button>
+      </div>
+
+      {orders.length === 0 ? (
+        <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300">
+          <Package size={80} className="mx-auto text-gray-400 mb-6" />
+          <p className="text-2xl font-medium text-gray-600">No delivered orders yet</p>
+          <p className="text-gray-500 mt-3">Delivered orders will appear here</p>
         </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">Total Refunds</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">₹{totalRefunds.toFixed(2)}</p>
-              </div>
-              <DollarSign className="w-8 h-8 text-green-500" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">Pending Returns</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{pendingReturns}</p>
-              </div>
-              <Clock className="w-8 h-8 text-yellow-500" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">Pending Shipping</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{pendingShipping}</p>
-              </div>
-              <Truck className="w-8 h-8 text-blue-500" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">Confirmed Orders</p>
-                <p className="text-2xl font-bold text-purple-900 mt-1">{confirmedReturns}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-purple-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* Filters and Search */}
-        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search by product, customer, order ID..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="bg-white border border-gray-300 rounded-xl p-3 pl-12 text-md text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none w-full shadow-md"
-              />
-            </div>
-            
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="bg-white border border-gray-300 rounded-xl p-3 text-md text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none shadow-md"
-            >
-              <option value="All">All Reasons</option>
-              <option value="Defective">Defective</option>
-              <option value="Damaged">Damaged</option>
-              <option value="Wrong Item">Wrong Item</option>
-            </select>
-            
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white border border-gray-300 rounded-xl p-3 text-md text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none shadow-md"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Pending">Pending</option>
-              <option value="Confirmed">Confirmed</option>
-              <option value="Refunded">Refunded</option>
-              <option value="Partial Refund">Partial Refund</option>
-              <option value="Rejected">Rejected</option>
-              <option value="Expired">Expired</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Returns Table */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+      ) : (
+        <div className="bg-white rounded-2xl shadow-xl border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[#586330] text-white">
                 <tr>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-900">Order ID</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-900">Product & Customer</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-900">Return Info</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-900">Financial</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-900">Status</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-900">Actions</th>
+                  <th className="px-8 py-5 text-left font-semibold">Order ID</th>
+                  <th className="px-8 py-5 text-left font-semibold">Customer</th>
+                  <th className="px-8 py-5 text-left font-semibold">Amount</th>
+                  <th className="px-8 py-5 text-left font-semibold">Delivered On</th>
+                  <th className="px-8 py-5 text-left font-semibold">Order Status</th>
+                  <th className="px-8 py-5 text-left font-semibold">Confirmation Status</th>
+                  <th className="px-8 py-5 text-center font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredReturns.length > 0 ? (
-                  filteredReturns.map((r) => {
-                    const daysSinceDelivery = calculateDaysSinceDelivery(r.deliveryDate);
-                    const daysUntilExpiry = calculateDaysUntilExpiry(r.returnRequestDate);
-                    const isWithinWindow = r.isWithinReturnWindow !== false;
-                    
-                    return (
-                      <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-5 px-6">
-                          <div className="font-semibold text-gray-900">{r.orderId}</div>
-                          <div className="text-sm text-gray-500 mt-1">
-                            Delivered: {formatDate(r.deliveryDate)}
-                          </div>
-                          {r.isReturnExpired && (
-                            <div className="text-xs text-red-600 mt-1">
-                              Expired: {formatDate(r.expiryDate)}
-                            </div>
-                          )}
-                        </td>
-                        
-                        <td className="py-5 px-6">
-                          <div className="font-medium text-gray-900">{r.product}</div>
-                          <div className="text-sm text-gray-500 mt-1">Qty: {r.quantity}</div>
-                          <div className="mt-3">
-                            <div className="font-medium text-gray-900">{r.customer}</div>
-                            <div className="text-sm text-gray-500">{r.email}</div>
-                          </div>
-                        </td>
-                        
-                        <td className="py-5 px-6">
-                          <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getReasonColor(r.reason)}`}>
-                            {r.reason}
-                          </div>
-                          <div className="mt-2">
-                            <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getShippingStatusColor(r.shippingStatus)}`}>
-                              {r.shippingStatus}
-                            </div>
-                          </div>
-                          {r.status === "Pending" && (
-                            <div className="mt-2 text-xs text-yellow-600">
-                              <Clock className="inline w-3 h-3 mr-1" />
-                              {daysUntilExpiry} days to return
-                            </div>
-                          )}
-                        </td>
-                        
-                        <td className="py-5 px-6">
-                          <div className="text-gray-900 font-medium">
-                            Purchase Price
-                            <div className="text-lg">₹{r.purchasePrice.toFixed(2)}</div>
-                          </div>
-                          <div className="mt-3">
-                            <div className="text-gray-500 text-sm">Refund Amount</div>
-                            <div className={`text-lg font-medium ${r.refundAmount > 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                              ₹{r.refundAmount.toFixed(2)}
-                            </div>
-                          </div>
-                        </td>
-                        
-                        <td className="py-5 px-6">
-                          <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(r.status)}`}>
-                            {r.status}
-                          </div>
-                          {r.status === "Confirmed" && (
-                            <div className="mt-2">
-                              <div className="text-xs font-medium text-gray-700">
-                                Vendor Payment:
-                              </div>
-                              <div className={`inline-block px-2 py-1 rounded text-xs font-medium ${r.vendorPaymentStatus === "Paid" ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {r.vendorPaymentStatus}
-                              </div>
-                            </div>
-                          )}
-                        </td>
-                        
-                        <td className="py-5 px-6">
-                          <div className="flex flex-col gap-2">
+              <tbody className="divide-y divide-gray-200">
+                {orders.map((order) => {
+                  const isReturned = order.ConfirmationStatus === "Returned";
+                  const isConfirmed = order.ConfirmationStatus === "Confirmed";
+                  const isExpired = order.ConfirmationStatus === "Expired";
+                  const vendorPaid = order.VendorPaymentStatus === "Paid";
+                  const refundPending = order.RefundStatus === "Pending";
+                  const hasReturn = isReturned || isConfirmed || isExpired;
+                  
+                  return (
+                    <tr key={order.Id} className="hover:bg-gray-50 transition">
+                      <td className="px-8 py-6 font-bold text-lg">#{order.Id}</td>
+                      <td className="px-8 py-6">
+                        <div className="font-medium text-gray-900">Customer #{order.CustomerId}</div>
+                      </td>
+                      <td className="px-8 py-6 font-bold text-2xl text-[#586330]">
+                        ₹{order.TotalAmount?.toFixed(2)}
+                      </td>
+                      <td className="px-8 py-6 text-gray-700">
+                        {formatDate(order.DeliveredDate)}
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className={`px-5 py-2 rounded-full font-medium ${getStatusBadge(order.OrderStatus)}`}>
+                          {order.OrderStatus}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className={`px-5 py-2 rounded-full font-medium ${getStatusBadge(order.ConfirmationStatus)}`}>
+                          {order.ConfirmationStatus}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex justify-center gap-4">
+                          {/* For Returned orders: Show View Return button */}
+                          {isReturned && (
                             <button
-                              onClick={() => {
-                                setViewItem(r);
-                                setActiveTab("details");
-                              }}
-                              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1"
+                              onClick={() => openReturnDetails(order)}
+                              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 transition shadow-md"
                             >
-                              <Eye className="w-4 h-4" /> View
+                              <Eye size={18} />
+                              View Return
                             </button>
-                            
-                            {r.status === "Confirmed" && r.vendorPaymentStatus === "Pending" && (
-                              <button
-                                onClick={() => handleVendorPayment(r.id)}
-                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1"
-                              >
-                               ₹ Pay Vendor
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="6" className="py-12 text-center">
-                      <div className="text-gray-500 flex flex-col items-center">
-                        <Search className="w-12 h-12 mb-4 text-gray-300" />
-                        <p className="text-lg">🔍 No returns match the current criteria.</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
+                          )}
+
+                          {/* For Confirmed orders: Show Pay Vendor button */}
+                          {isConfirmed && !vendorPaid && (
+                            <button
+                              onClick={() => handlePayVendor(order.Id)}
+                              disabled={processingVendorPayment}
+                              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {processingVendorPayment ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <DollarSign size={18} />
+                                  Pay Vendor
+                                </>
+                              )}
+                            </button>
+                          )}
+
+                          {/* For Confirmed orders with vendor already paid */}
+                          {isConfirmed && vendorPaid && (
+                            <div className="flex items-center gap-2 text-green-600 font-bold">
+                              <CheckCircle size={20} />
+                              Vendor Paid
+                            </div>
+                          )}
+
+                          {/* For Expired orders: Show View Details button */}
+                          {isExpired && (
+                            <button
+                              onClick={() => openConfirmedDetails(order)}
+                              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2 transition shadow-md"
+                            >
+                              <Eye size={18} />
+                              View Details
+                            </button>
+                          )}
+
+                          {/* For orders that are just Delivered (not Returned/Confirmed/Expired) */}
+                          {!hasReturn && (
+                            <div className="text-gray-500 italic">
+                              Awaiting customer confirmation
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
-      </div>
-
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div className="bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-up">
-            <span>{toast}</span>
-          </div>
-        </div>
       )}
 
-      {/* View Details Modal */}
-      {viewItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="px-8 py-6 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Return Details</h2>
-                <p className="text-gray-600">Order #{viewItem.orderId}</p>
-              </div>
-              <button
-                onClick={() => {
-                  setViewItem(null);
-                  setActiveTab("details");
-                }}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Tabs */}
-            <div className="border-b border-gray-200 px-8">
-              <div className="flex space-x-6">
+      {/* Return Details Modal (for Returned status) */}
+      {showReturnModal && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-10 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-4xl font-bold text-gray-900">
+                  Return Request - Order #{selectedOrder.Id}
+                </h3>
                 <button
-                  onClick={() => setActiveTab("details")}
-                  className={`pb-3 px-2 font-medium transition-colors ${
-                    activeTab === "details"
-                      ? "text-blue-600 border-b-2 border-blue-600"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Return Details
-                </button>
-                
-                {/* Hide Shipping Info tab for Confirmed orders (has Pay Vendor button) */}
-                {viewItem.status !== "Confirmed" && (
-                  <button
-                    onClick={() => setActiveTab("shipping")}
-                    className={`pb-3 px-2 font-medium transition-colors ${
-                      activeTab === "shipping"
-                        ? "text-blue-600 border-b-2 border-blue-600"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    Shipping Info
-                  </button>
-                )}
-                
-                {viewItem.status === "Confirmed" && (
-                  <button
-                    onClick={() => setActiveTab("vendor")}
-                    className={`pb-3 px-2 font-medium transition-colors ${
-                      activeTab === "vendor"
-                        ? "text-blue-600 border-b-2 border-blue-600"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    Vendor Payment
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto p-8">
-              {activeTab === "details" && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Left Column */}
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Information</h3>
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Order Date:</span>
-                          <span className="font-medium">{formatDate(viewItem.orderDate)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Delivery Date:</span>
-                          <span className="font-medium">{formatDate(viewItem.deliveryDate)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Return Request:</span>
-                          <span className="font-medium">{formatDate(viewItem.returnRequestDate)}</span>
-                        </div>
-                        {viewItem.expiryDate && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Return Expiry:</span>
-                            <span className={`font-medium ${viewItem.isReturnExpired ? 'text-red-600' : 'text-green-600'}`}>
-                              {formatDate(viewItem.expiryDate)}
-                              {viewItem.isReturnExpired && ' (Expired)'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Details</h3>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-gray-400" />
-                          <span className="font-medium">{viewItem.customer}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-4 h-4 text-gray-400" />
-                          <span>{viewItem.email}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Customer ID:</span>
-                          <span className="ml-2 font-medium">{viewItem.customerId}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Middle Column */}
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <span className="text-gray-600">Product:</span>
-                          <div className="font-medium mt-1">{viewItem.product}</div>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Quantity:</span>
-                          <span className="font-medium">{viewItem.quantity}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Reason:</span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getReasonColor(viewItem.reason)}`}>
-                            {viewItem.reason}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Vendor Details</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <span className="text-gray-600">Name:</span>
-                          <div className="font-medium">{viewItem.vendor.name}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Contact:</span>
-                          <div className="font-medium">{viewItem.vendor.contactPerson}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Email:</span>
-                          <div className="font-medium">{viewItem.vendor.email}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column - Actions */}
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
-                      {viewItem.refundAmount > 0 && (
-                        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="flex items-center gap-2 text-green-700">
-                            <CheckCircle className="w-5 h-5" />
-                            <span className="font-medium">✓ Refund Already Processed: ₹{viewItem.refundAmount.toFixed(2)}</span>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Refund Amount Input */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Refund Amount (₹)
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            value={refundAmount}
-                            onChange={(e) => setRefundAmount(e.target.value)}
-                            disabled={viewItem.refundAmount > 0 || viewItem.status === "Confirmed"}
-                            className="flex-1 border border-gray-300 rounded-lg p-3 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
-                            placeholder={viewItem.refundAmount > 0 ? "Refund completed" : "Enter amount"}
-                            min="0"
-                            max={viewItem.purchasePrice}
-                            step="0.01"
-                          />
-                          <button
-                            onClick={() => handleRefundUpdate(viewItem.id)}
-                            disabled={viewItem.refundAmount > 0 || viewItem.status === "Confirmed"}
-                            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 transition-colors"
-                            title={viewItem.refundAmount > 0 ? "Refund already processed" : "Process refund"}
-                          >
-                            <DollarSign className="w-4 h-4" /> Refund
-                          </button>
-                        </div>
-                        <div className="text-sm text-gray-500 mt-2">
-                          Purchase Price: ₹{viewItem.purchasePrice.toFixed(2)}
-                        </div>
-                      </div>
-
-                      {/* Quick Actions - Hide for Confirmed orders */}
-                      {viewItem.status !== "Confirmed" && (
-                        <div className="space-y-3">
-                          <h4 className="text-sm font-medium text-gray-700">Quick Actions</h4>
-                          <div className="grid grid-cols-2 gap-3">
-                            <button
-                              onClick={() => {
-                                setRefundAmount(viewItem.purchasePrice);
-                              }}
-                              disabled={viewItem.refundAmount > 0 || viewItem.status === "Confirmed"}
-                              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-lg text-sm font-medium disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-100 transition-colors"
-                            >
-                              Full Refund
-                            </button>
-                            <button
-                              onClick={() => {
-                                setRefundAmount(viewItem.purchasePrice * 0.5);
-                              }}
-                              disabled={viewItem.refundAmount > 0 || viewItem.status === "Confirmed"}
-                              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-lg text-sm font-medium disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-100 transition-colors"
-                            >
-                              50% Refund
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Vendor Payment Button for Confirmed Orders */}
-                      {viewItem.status === "Confirmed" && viewItem.vendorPaymentStatus === "Pending" && (
-                        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <h4 className="font-medium text-yellow-800 mb-2">Vendor Payment Pending</h4>
-                          <p className="text-sm text-yellow-700 mb-3">
-                            The return window has expired. Customer did not return the product within 2 days.
-                            You can now process vendor payment with 20% commission.
-                          </p>
-                          <button
-                            onClick={() => handleVendorPayment(viewItem.id)}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
-                          >
-                            <DollarSign className="w-4 h-4" /> Pay Vendor
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Shipping Info Tab - Only show for non-Confirmed orders */}
-              {activeTab === "shipping" && viewItem.status !== "Confirmed" && (
-                <div className="max-w-2xl mx-auto">
-                  {viewItem.shippingInfo ? (
-                    <div className="bg-white p-6 rounded-lg border border-gray-200">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-6">Shipping Information</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Tracking ID</label>
-                          <div className="font-medium bg-gray-50 p-3 rounded-lg">{viewItem.shippingInfo.trackingId}</div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Carrier</label>
-                          <div className="font-medium bg-gray-50 p-3 rounded-lg">{viewItem.shippingInfo.carrier}</div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Cost</label>
-                          <div className="font-medium bg-gray-50 p-3 rounded-lg">₹{viewItem.shippingInfo.shippingCost}</div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Delivery</label>
-                          <div className="font-medium bg-gray-50 p-3 rounded-lg">{formatDate(viewItem.shippingInfo.estimatedDelivery)}</div>
-                        </div>
-                      </div>
-                      {viewItem.shippingInfo.notes && (
-                        <div className="mt-6">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                          <div className="bg-gray-50 p-4 rounded-lg">{viewItem.shippingInfo.notes}</div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No shipping information available yet</h3>
-                      <p className="text-gray-600 mb-6">Shipping details will appear once the return is initiated.</p>
-                      {viewItem.isWithinReturnWindow && viewItem.shippingStatus !== "Returned to Vendor" && (
-                        <button
-                          onClick={() => setShowShippingForm(true)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg flex items-center gap-2 mx-auto"
-                        >
-                          <Truck className="w-5 h-5" /> Initiate Return Shipping
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === "vendor" && viewItem.status === "Confirmed" && (
-                <div className="max-w-2xl mx-auto">
-                  <div className="bg-white p-8 rounded-xl border border-gray-200">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Vendor Payment</h3>
-                    <p className="text-gray-600 mb-8">
-                      The return window has expired. Customer did not return the product within 2 days.
-                      You can now process payment to the vendor with 20% commission.
-                    </p>
-
-                    <div className="space-y-6">
-                      {/* Commission Info Card */}
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Percent className="w-5 h-5 text-blue-600" />
-                          <div>
-                            <h4 className="font-medium text-blue-900">Commission Information</h4>
-                            <p className="text-sm text-blue-700 mt-1">
-                              20% commission will be deducted from the total amount and retained by admin.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h4>
-                          <div className="space-y-3">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Order ID:</span>
-                              <span className="font-medium">{viewItem.orderId}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Product:</span>
-                              <span className="font-medium">{viewItem.product}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Purchase Price:</span>
-                              <span className="font-medium">₹{viewItem.purchasePrice.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-green-600">
-                              <span className="font-medium">Admin Commission (20%):</span>
-                              <span className="font-bold">+ ₹{(viewItem.purchasePrice * COMMISSION_RATE).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-blue-600">
-                              <span className="font-medium">Vendor Amount (80%):</span>
-                              <span className="font-bold">₹{(viewItem.purchasePrice * (1 - COMMISSION_RATE)).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between border-t pt-3">
-                              <span className="text-gray-900 font-semibold">Total Amount:</span>
-                              <span className="text-gray-900 font-bold">₹{viewItem.purchasePrice.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Vendor Details</h4>
-                          <div className="space-y-3">
-                            <div>
-                              <span className="text-gray-600">Vendor Name:</span>
-                              <div className="font-medium">{viewItem.vendor.name}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Contact Person:</span>
-                              <div className="font-medium">{viewItem.vendor.contactPerson}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Email:</span>
-                              <div className="font-medium">{viewItem.vendor.email}</div>
-                            </div>
-                            {viewItem.vendor.bankDetails && (
-                              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                                <h5 className="font-medium text-gray-700 mb-2">Bank Details</h5>
-                                <div className="text-sm space-y-1">
-                                  <div>Bank: {viewItem.vendor.bankDetails.bankName}</div>
-                                  <div>Account: {viewItem.vendor.bankDetails.accountNumber}</div>
-                                  <div>Account Name: {viewItem.vendor.bankDetails.accountName}</div>
-                                </div>
-                              </div>
-                            )}
-                            <div>
-                              <span className="text-gray-600">Payment Status:</span>
-                              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${viewItem.vendorPaymentStatus === "Paid" ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {viewItem.vendorPaymentStatus}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {viewItem.vendorPaymentStatus === "Pending" && (
-                        <div className="pt-6 border-t">
-                          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <h4 className="font-medium text-green-900">Payment Summary</h4>
-                                <div className="flex gap-4 mt-2">
-                                  <div className="text-green-700">
-                                    <div className="text-sm">Admin Commission</div>
-                                    <div className="font-bold">₹{(viewItem.purchasePrice * COMMISSION_RATE).toFixed(2)}</div>
-                                  </div>
-                                  <div className="text-blue-700">
-                                    <div className="text-sm">Vendor Payment</div>
-                                    <div className="font-bold">₹{(viewItem.purchasePrice * (1 - COMMISSION_RATE)).toFixed(2)}</div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleVendorPayment(viewItem.id)}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 shadow-lg"
-                          >
-                            <DollarSign className="w-6 h-6" />
-                            Process Vendor Payment
-                          </button>
-                          <p className="text-center text-sm text-gray-500 mt-3">
-                            Admin will retain ₹{(viewItem.purchasePrice * COMMISSION_RATE).toFixed(2)} commission
-                          </p>
-                        </div>
-                      )}
-
-                      {viewItem.vendorPaymentStatus === "Paid" && (
-                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="flex items-center gap-3 text-green-700">
-                            <CheckCircle className="w-5 h-5" />
-                            <div>
-                              <h4 className="font-medium">Payment Processed Successfully!</h4>
-                              <p className="text-sm mt-1">
-                                Date: {viewItem.paymentDate ? formatDate(viewItem.paymentDate) : formatDate(new Date())}
-                              </p>
-                              <div className="flex gap-4 mt-2">
-                                <div>
-                                  <div className="text-sm">Admin Received:</div>
-                                  <div className="font-bold">₹{viewItem.adminAmount?.toFixed(2) || (viewItem.purchasePrice * COMMISSION_RATE).toFixed(2)}</div>
-                                </div>
-                                <div>
-                                  <div className="text-sm">Vendor Received:</div>
-                                  <div className="font-bold">₹{viewItem.vendorAmount?.toFixed(2) || (viewItem.purchasePrice * (1 - COMMISSION_RATE)).toFixed(2)}</div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="px-8 py-6 border-t border-gray-200 flex justify-end">
-              <button
-                onClick={() => {
-                  setViewItem(null);
-                  setActiveTab("details");
-                }}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2.5 rounded-xl font-semibold"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Return Shipping Form Modal - Only show for non-Confirmed orders */}
-      {showShippingForm && viewItem && viewItem.status !== "Confirmed" && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-8">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Shipping Information</h2>
-                  <p className="text-gray-600 mt-1">Order #{viewItem.orderId} • Product: {viewItem.product}</p>
-                </div>
-                <button
-                  onClick={() => setShowShippingForm(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                  onClick={() => setShowReturnModal(false)}
+                  className="text-4xl text-gray-500 hover:text-gray-700"
                 >
                   ×
                 </button>
               </div>
+            </div>
 
-              {/* Vendor Info */}
-              <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="font-semibold text-blue-900 mb-3">Ship to Vendor</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-10 space-y-10">
+              {/* Status Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="bg-red-50 p-8 rounded-2xl text-center border border-red-200">
+                  <p className="text-lg font-medium text-red-700">Return Status</p>
+                  <p className="text-3xl font-bold text-red-900 mt-4">
+                    {selectedOrder.Status || "Returned"}
+                  </p>
+                </div>
+                <div className="bg-yellow-50 p-8 rounded-2xl text-center border border-yellow-200">
+                  <p className="text-lg font-medium text-yellow-700">Customer Refund</p>
+                  <p className="text-3xl font-bold text-yellow-900 mt-4">
+                    {selectedOrder.RefundStatus || "Pending"}
+                  </p>
+                </div>
+                <div className="bg-purple-50 p-8 rounded-2xl text-center border border-purple-200">
+                  <p className="text-lg font-medium text-purple-700">Vendor Payment</p>
+                  <p className="text-3xl font-bold text-purple-900 mt-4">
+                    {selectedOrder.VendorPaymentStatus || "Pending"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Amount Breakdown */}
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-8 rounded-2xl border border-amber-300">
+                <h4 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                  <IndianRupee size={32} />
+                  Payment Breakdown
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
                   <div>
-                    <label className="block text-sm font-medium text-blue-700 mb-1">Vendor Name</label>
-                    <div className="font-medium">{viewItem.vendor.name}</div>
+                    <p className="text-gray-700 text-lg">Total Amount</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">
+                      ₹{selectedOrder.TotalAmount?.toFixed(2)}
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-blue-700 mb-1">Contact Person</label>
-                    <div className="font-medium">{viewItem.vendor.contactPerson}</div>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-blue-700 mb-1">Shipping Address</label>
-                    <div className="font-medium">{viewItem.vendor.address}</div>
+                    <p className="text-gray-700 text-lg">Commission (20%)</p>
+                    <p className="text-2xl font-bold text-orange-600 mt-2">
+                      ₹{(selectedOrder.TotalAmount * 0.2).toFixed(2)}
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-blue-700 mb-1">Email</label>
-                    <div className="font-medium">{viewItem.vendor.email}</div>
+                    <p className="text-gray-700 text-lg">Vendor Payout (80%)</p>
+                    <p className="text-2xl font-bold text-green-600 mt-2">
+                      ₹{(selectedOrder.TotalAmount * 0.8).toFixed(2)}
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-blue-700 mb-1">Phone</label>
-                    <div className="font-medium">{viewItem.vendor.phone}</div>
+                    <p className="text-gray-700 text-lg">Customer Refund</p>
+                    <p className="text-3xl font-bold text-red-600 mt-2">
+                      ₹{selectedOrder.RefundAmount?.toFixed(2) || selectedOrder.TotalAmount?.toFixed(2)}
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Shipping Form */}
-              <form onSubmit={handleShippingSubmit}>
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tracking ID *</label>
-                    <input
-                      type="text"
-                      required
-                      value={shippingInfo.trackingId}
-                      onChange={(e) => setShippingInfo({...shippingInfo, trackingId: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter tracking number"
-                    />
+              {/* Return Reason Section - Important for Refund */}
+              {selectedOrder.Reason && (
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-2xl font-bold text-red-900">Customer Return Reason</h4>
+                    <div className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-medium">
+                      This reason will be used for refund
+                    </div>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Carrier *</label>
-                    <select
-                      required
-                      value={shippingInfo.carrier}
-                      onChange={(e) => setShippingInfo({...shippingInfo, carrier: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select Carrier</option>
-                      <option value="FedEx">FedEx</option>
-                      <option value="UPS">UPS</option>
-                      <option value="DHL">DHL</option>
-                      <option value="USPS">USPS</option>
-                      <option value="Amazon Logistics">Amazon Logistics</option>
-                      <option value="Other">Other</option>
-                    </select>
+                  <div className="bg-red-50 border-2 border-red-300 p-8 rounded-2xl">
+                    <p className="text-xl italic text-red-800 leading-relaxed">
+                      "{selectedOrder.Reason}"
+                    </p>
                   </div>
+                </div>
+              )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Cost (₹)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={shippingInfo.shippingCost}
-                      onChange={(e) => setShippingInfo({...shippingInfo, shippingCost: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0.00"
-                    />
+              {/* Returned Items */}
+              <div>
+                <h4 className="text-2xl font-bold mb-6">Returned Items</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {(selectedOrder.Items || []).map((item, i) => (
+                    <div key={i} className="bg-gray-50 border border-gray-300 p-6 rounded-xl">
+                      <p className="font-bold text-lg text-gray-900">{item.ProductName}</p>
+                      <div className="mt-4 flex justify-between text-lg">
+                        <span className="text-gray-600">Quantity:</span>
+                        <span className="font-bold">{item.Quantity}</span>
+                      </div>
+                      <div className="mt-2 flex justify-between text-xl">
+                        <span className="text-gray-600">Price:</span>
+                        <span className="font-bold text-[#586330]">₹{item.Price?.toFixed(2)}</span>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-gray-300 flex justify-between">
+                        <span className="text-gray-700 font-medium">Total:</span>
+                        <span className="text-2xl font-bold text-red-600">
+                          ₹{(item.Quantity * item.Price).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pickup Info */}
+              {selectedOrder.TrackingId && (
+                <div>
+                  <h4 className="text-2xl font-bold mb-4 flex items-center gap-3 text-purple-900">
+                    <Truck size={32} />
+                    Pickup Information
+                  </h4>
+                  <div className="bg-purple-50 border-2 border-purple-300 p-8 rounded-2xl space-y-4">
+                    <p className="text-lg">
+                      <strong>Carrier:</strong> {selectedOrder.CarrierName || "Not specified"}
+                    </p>
+                    <p className="text-lg">
+                      <strong>Tracking ID:</strong>{" "}
+                      <span className="font-mono bg-white px-4 py-2 rounded-lg border">
+                        {selectedOrder.TrackingId}
+                      </span>
+                    </p>
                   </div>
+                </div>
+              )}
 
+              {/* Payment Information */}
+              <div className="bg-blue-50 p-6 rounded-2xl border-2 border-blue-300">
+                <h4 className="text-2xl font-bold mb-4 text-blue-900">Payment Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Delivery Date *</label>
-                    <input
-                      type="date"
-                      required
-                      value={shippingInfo.estimatedDelivery}
-                      onChange={(e) => setShippingInfo({...shippingInfo, estimatedDelivery: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    <p className="font-medium text-gray-700">Payment ID:</p>
+                    <p className="font-mono bg-white p-2 rounded border break-all">
+                      {selectedOrder.PaymentId || "N/A"}
+                    </p>
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Return Reason for Vendor</label>
-                    <textarea
-                      value={shippingInfo.returnReason}
-                      onChange={(e) => setShippingInfo({...shippingInfo, returnReason: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      rows="2"
-                      placeholder="Brief reason for return to vendor..."
-                    />
+                    <p className="font-medium text-gray-700">Razorpay Order ID:</p>
+                    <p className="font-mono bg-white p-2 rounded border break-all">
+                      {selectedOrder.RazorpayOrderId || "N/A"}
+                    </p>
                   </div>
+                </div>
+                {!selectedOrder.PaymentId && (
+                  <p className="mt-3 text-red-600 font-medium">
+                    ⚠️ Payment ID is missing. Cannot process refund without Payment ID.
+                  </p>
+                )}
+              </div>
 
+              {/* Action Buttons */}
+              <div className="pt-8 border-t-4 border-gray-300">
+                <div className="flex justify-between items-center">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
-                    <textarea
-                      value={shippingInfo.notes}
-                      onChange={(e) => setShippingInfo({...shippingInfo, notes: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      rows="3"
-                      placeholder="Any additional notes for the vendor..."
-                    />
+                    <h4 className="text-xl font-bold text-gray-900 mb-2">Refund Details</h4>
+                    <p className="text-gray-600">
+                      Amount to refund: <span className="font-bold text-2xl text-red-600">
+                        ₹{selectedOrder.RefundAmount?.toFixed(2) || selectedOrder.TotalAmount?.toFixed(2)}
+                      </span>
+                    </p>
+                    <p className="text-gray-600 mt-1">
+                      Refund status: <span className={`font-bold ${selectedOrder.RefundStatus === "Pending" ? "text-yellow-600" : "text-green-600"}`}>
+                        {selectedOrder.RefundStatus || "Pending"}
+                      </span>
+                    </p>
                   </div>
+                  
+                  <div className="flex gap-4">
+                    {/* Refund Button - Only show if refund is pending AND PaymentId exists */}
+                    {selectedOrder.RefundStatus === "Pending" && selectedOrder.PaymentId && (
+                      <button
+                        onClick={handleProcessRefund}
+                        disabled={processingRefund}
+                        className="px-8 py-4 bg-red-600 text-white text-xl font-bold rounded-xl hover:bg-red-700 transition flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                      >
+                        {processingRefund ? (
+                          <>
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                            Processing Refund...
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard size={24} />
+                            Process Razorpay Refund
+                          </>
+                        )}
+                      </button>
+                    )}
 
-                  <div className="flex justify-end gap-3 pt-4 border-t">
+                    {/* Show status if refund already processed */}
+                    {selectedOrder.RefundStatus === "Completed" && (
+                      <div className="flex items-center gap-3 px-8 py-4 bg-green-100 text-green-800 rounded-xl border-2 border-green-300">
+                        <CheckCircle size={24} />
+                        <div>
+                          <p className="font-bold text-xl">Refund Completed</p>
+                          <p className="text-sm">via Razorpay</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show warning if PaymentId is missing */}
+                    {selectedOrder.RefundStatus === "Pending" && !selectedOrder.PaymentId && (
+                      <div className="flex items-center gap-3 px-8 py-4 bg-yellow-100 text-yellow-800 rounded-xl border-2 border-yellow-300">
+                        <AlertCircle size={24} />
+                        <div>
+                          <p className="font-bold text-xl">Cannot Process Refund</p>
+                          <p className="text-sm">Payment ID is missing</p>
+                        </div>
+                      </div>
+                    )}
+
                     <button
-                      type="button"
-                      onClick={() => setShowShippingForm(false)}
-                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                      onClick={() => setShowReturnModal(false)}
+                      className="px-10 py-4 bg-[#586330] text-white text-xl font-bold rounded-xl hover:bg-[#586330]/90 transition"
                     >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 shadow-lg"
-                    >
-                      Initiate Return Shipping
+                      Close
                     </button>
                   </div>
                 </div>
-              </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmed/Expired Details Modal */}
+      {showConfirmedModal && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-10 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-4xl font-bold text-gray-900">
+                  Order #{selectedOrder.Id} - {selectedOrder.ConfirmationStatus}
+                </h3>
+                <button
+                  onClick={() => setShowConfirmedModal(false)}
+                  className="text-4xl text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="p-10 space-y-10">
+              {/* Status Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className={`p-8 rounded-2xl text-center border ${
+                  selectedOrder.ConfirmationStatus === "Confirmed" 
+                    ? "bg-blue-50 border-blue-200" 
+                    : "bg-purple-50 border-purple-200"
+                }`}>
+                  <p className="text-lg font-medium">Confirmation Status</p>
+                  <p className="text-3xl font-bold mt-4">
+                    {selectedOrder.ConfirmationStatus}
+                  </p>
+                </div>
+                <div className="bg-green-50 p-8 rounded-2xl text-center border border-green-200">
+                  <p className="text-lg font-medium text-green-700">Vendor Payment</p>
+                  <p className="text-3xl font-bold text-green-900 mt-4">
+                    {selectedOrder.VendorPaymentStatus === "Paid" ? "Paid" : "Pending"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Order Summary */}
+              <div className="bg-gray-50 p-8 rounded-2xl border border-gray-300">
+                <h4 className="text-2xl font-bold mb-6">Order Summary</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-gray-600">Order ID</p>
+                    <p className="text-xl font-bold">#{selectedOrder.Id}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Total Amount</p>
+                    <p className="text-2xl font-bold text-[#586330]">
+                      ₹{selectedOrder.TotalAmount?.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Delivered On</p>
+                    <p className="text-lg">{formatDate(selectedOrder.DeliveredDate)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div>
+                <h4 className="text-2xl font-bold mb-6">Order Items</h4>
+                <div className="space-y-4">
+                  {(selectedOrder.Items || []).map((item, i) => (
+                    <div key={i} className="flex justify-between items-center p-4 bg-white border border-gray-200 rounded-lg">
+                      <div>
+                        <p className="font-semibold">{item.ProductName}</p>
+                        <p className="text-gray-600">Qty: {item.Quantity}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg">₹{item.Price?.toFixed(2)} × {item.Quantity}</p>
+                        <p className="text-xl font-bold text-[#586330]">
+                          ₹{(item.Quantity * item.Price).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Message based on status */}
+              <div className={`p-6 rounded-2xl ${
+                selectedOrder.ConfirmationStatus === "Confirmed" 
+                  ? "bg-blue-50 border-2 border-blue-300" 
+                  : "bg-purple-50 border-2 border-purple-300"
+              }`}>
+                <h4 className="text-xl font-bold mb-3">
+                  {selectedOrder.ConfirmationStatus === "Confirmed" 
+                    ? "✅ Order Confirmed Successfully" 
+                    : "⏰ Return Window Expired"}
+                </h4>
+                <p className="text-lg">
+                  {selectedOrder.ConfirmationStatus === "Confirmed" 
+                    ? "Customer has confirmed receipt of order. Vendor can now be paid." 
+                    : "Customer did not confirm receipt within 1 hour window. No return requested."}
+                </p>
+              </div>
+
+              {/* Pay Vendor Button for Confirmed orders */}
+              {selectedOrder.ConfirmationStatus === "Confirmed" && selectedOrder.VendorPaymentStatus !== "Paid" && (
+                <div className="bg-green-50 p-6 rounded-2xl border-2 border-green-300">
+                  <h4 className="text-2xl font-bold mb-4 text-green-900">Vendor Payment Required</h4>
+                  <div className="mb-6">
+                    <p className="text-lg">Total order amount: <span className="font-bold">₹{selectedOrder.TotalAmount?.toFixed(2)}</span></p>
+                    <p className="text-lg mt-2">Vendor payout (80%): <span className="font-bold text-2xl text-green-700">₹{(selectedOrder.TotalAmount * 0.8).toFixed(2)}</span></p>
+                    <p className="text-lg mt-2">Commission (20%): <span className="font-bold text-orange-600">₹{(selectedOrder.TotalAmount * 0.2).toFixed(2)}</span></p>
+                  </div>
+                  <button
+                    onClick={() => handlePayVendor(selectedOrder.Id)}
+                    disabled={processingVendorPayment}
+                    className="px-8 py-4 bg-green-600 text-white text-xl font-bold rounded-xl hover:bg-green-700 transition flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {processingVendorPayment ? (
+                      <>
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <DollarSign size={24} />
+                        Pay Vendor (80%)
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              <div className="pt-8 border-t-4 border-gray-300 flex justify-end">
+                <button
+                  onClick={() => setShowConfirmedModal(false)}
+                  className="px-10 py-4 bg-[#586330] text-white text-xl font-bold rounded-xl hover:bg-[#586330]/90 transition"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -37,7 +37,6 @@ export default function Navbar() {
             <Link to="/support-adminchattosupport" className="hover:text-[#d7dcc4] transition-colors">Chat Support</Link>
             <Link to="/Transaction" className="hover:text-[#d7dcc4] transition-colors">Transactions</Link>
             <Link to="/Vendors" className="hover:text-[#d7dcc4] transition-colors">Vendors</Link>
-            <Link to="/product-returns" className="hover:text-[#d7dcc4] transition-colors">Product Returns</Link>
             <Link to="/support-team" className="hover:text-[#d7dcc4] transition-colors">Support Team</Link>
 
             {/* Logout Button Desktop */}

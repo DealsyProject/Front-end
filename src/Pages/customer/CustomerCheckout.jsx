@@ -156,7 +156,7 @@ export default function CustomerCheckout() {
       key: razorpayKey,
       amount: Math.round(amount * 100), // Convert to paise and round
       currency: currency,
-      name: 'Dealsy Furniture',
+      name: 'Dealsy',
       description: 'Order Payment',
       order_id: razorpayOrderId,
       handler: async function (response) {

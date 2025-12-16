@@ -61,17 +61,20 @@ export default function CustomerOrders() {
 
   // Return allowed only if: Delivered + within 1 hour + not already returned
   const canReturnOrder = (order) => {
-    if (!order) return false;
-    if (order.Status?.toLowerCase() !== "delivered") return false;
-    if (order.ConfirmationStatus === "Returned" || order.ConfirmationStatus === "Expired") return false;
-    if (!order.DeliveredDate) return false;
+  if (!order) return false;
+  
+  // Check both OrderStatus and Status fields
+  const status = (order.OrderStatus || order.Status)?.toLowerCase();
+  if (status !== "delivered") return false;
+  
+  if (order.ConfirmationStatus === "Returned" || order.ConfirmationStatus === "Expired") return false;
+  if (!order.DeliveredDate) return false;
 
-    const delivered = new Date(order.DeliveredDate);
-    const now = new Date();
-    const hoursDiff = (now - delivered) / (1000 * 60 * 60);
-    return hoursDiff >= 0 && hoursDiff <= 1;
-  };
-
+  const delivered = new Date(order.DeliveredDate);
+  const now = new Date();
+  const hoursDiff = (now - delivered) / (1000 * 60 * 60);
+  return hoursDiff >= 0 && hoursDiff <= 1;
+};
   const handleReturnRequest = async () => {
     if (!returnReason.trim()) {
       alert("Please select a reason for return.");
@@ -229,27 +232,27 @@ export default function CustomerOrders() {
                             </span>
                           </div>
 
-                          {/* Return Window Indicator */}
-                          {order.Status?.toLowerCase() === "delivered" && (
-                            <div className="mt-4 text-lg">
-                              {isReturnEligible ? (
-                                <div className="flex items-center justify-end gap-2 text-green-600 font-bold">
-                                  <Clock size={20} />
-                                  Return window open
-                                </div>
-                              ) : isReturned ? (
-                                <div className="flex items-center justify-end gap-2 text-red-600 font-bold">
-                                  <AlertCircle size={20} />
-                                  Return Requested
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-end gap-2 text-gray-600">
-                                  <AlertCircle size={20} />
-                                  Return window expired
-                                </div>
-                              )}
-                            </div>
-                          )}
+                         {/* In your component */}
+{order.Status?.toLowerCase() === "delivered" || order.OrderStatus?.toLowerCase() === "delivered" ? (
+  <div className="mt-4 text-lg">
+    {canReturnOrder(order) ? (
+      <div className="flex items-center justify-end gap-2 text-green-600 font-bold">
+        <Clock size={20} />
+        Return window open
+      </div>
+    ) : order.ConfirmationStatus === "Returned" ? (
+      <div className="flex items-center justify-end gap-2 text-red-600 font-bold">
+        <AlertCircle size={20} />
+        Return Requested
+      </div>
+    ) : (
+      <div className="flex items-center justify-end gap-2 text-gray-600">
+        <AlertCircle size={20} />
+        Return window expired or not eligible
+      </div>
+    )}
+  </div>
+) : null}
                         </div>
                       </div>
                     </div>

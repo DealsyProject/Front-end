@@ -9,7 +9,7 @@ import OrdersPage from './Pages/Admin/OrdersPage.jsx';
 import TransactionsPage from './Pages/Admin/TransactionsPage.jsx';
 import UserManagement from './Pages/Admin/UserManagment.jsx';
 import PendingVendors from './Pages/Admin/PendingVendors.jsx';
-import ProductReturnPage from "./Pages/Admin/ProductReturnPage.jsx";
+
 import SupportTeamPage from "./Pages/Admin/SupportTeamPage.jsx";
 
 
@@ -73,7 +73,7 @@ function App() {
         <Route path="/Transaction" element={<TransactionsPage />} />
         <Route path="/user" element={<UserManagement />} />
         <Route path="/Vendors" element={<PendingVendors />} />
-        <Route path="/product-returns" element={<ProductReturnPage />} />
+     
         <Route path="/support-team" element={<SupportTeamPage />} />
 
 

@@ -23,6 +23,7 @@ const Products = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState(''); // Actual query sent to API
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -36,7 +37,7 @@ const Products = () => {
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [categories, setCategories] = useState([]);
   const [vendorProfile, setVendorProfile] = useState(null);
-  const [availableCategories, setAvailableCategories] = useState([]); // Categories based on profile
+  const [availableCategories, setAvailableCategories] = useState([]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -76,25 +77,22 @@ const Products = () => {
     [handleLogout]
   );
 
-  // Fetch vendor profile to get business type
+  // Fetch vendor profile
   const fetchVendorProfile = useCallback(async () => {
     try {
       setProfileLoading(true);
       const response = await axiosInstance.get('/vendorprofile');
       const profileData = response.data?.Profile || response.data?.profile;
-      
+
       if (profileData) {
         setVendorProfile(profileData);
-        console.log('📋 Vendor profile loaded:', profileData.BusinessType);
         return profileData.BusinessType;
       } else {
-        console.log('⚠️ No vendor profile found');
         toast.info('Please create your profile first to add products');
         setVendorProfile(null);
         return null;
       }
     } catch (error) {
-      console.error('❌ Error fetching vendor profile:', error);
       if (error.response?.status !== 404) {
         toast.error('Failed to load vendor profile');
       }
@@ -110,7 +108,6 @@ const Products = () => {
     try {
       setCategoriesLoading(true);
       const response = await axiosInstance.get('/Category');
-      
       const allCategories = (response.data.Categories || [])
         .map(cat => cat.Name)
         .sort();
@@ -121,7 +118,6 @@ const Products = () => {
         toast.info('No categories found. Ask admin to create some.');
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
       toast.error('Failed to load categories');
       setCategories([]);
     } finally {
@@ -129,32 +125,26 @@ const Products = () => {
     }
   }, []);
 
-  // Filter categories based on vendor profile
+  // Filter categories based on business type
   const getFilteredCategories = useCallback((allCategories, businessType) => {
-    if (!businessType) {
-      return []; // No profile, no categories available
-    }
+    if (!businessType) return [];
 
     if (businessType === 'All') {
-      // If vendor selected "All", show "All" button + all categories
       return ['All', ...allCategories];
     }
 
-    // If vendor has specific business type, show ONLY that category
     return [businessType];
   }, []);
 
-  // Load profile and categories on mount
+  // Load initial data
   useEffect(() => {
     const loadData = async () => {
       const businessType = await fetchVendorProfile();
       await fetchCategories();
-      
-      // After both are loaded, filter categories
+
       if (businessType) {
         const filtered = getFilteredCategories(categories, businessType);
         setAvailableCategories(filtered);
-        console.log('✅ Available categories for vendor:', filtered);
       } else {
         setAvailableCategories([]);
       }
@@ -163,7 +153,6 @@ const Products = () => {
     loadData();
   }, [fetchVendorProfile, fetchCategories, getFilteredCategories]);
 
-  // Update available categories when categories or profile changes
   useEffect(() => {
     if (vendorProfile && categories.length > 0) {
       const filtered = getFilteredCategories(categories, vendorProfile.BusinessType);
@@ -171,7 +160,7 @@ const Products = () => {
     }
   }, [vendorProfile, categories, getFilteredCategories]);
 
-  // Normalize incoming PascalCase → camelCase
+  // Normalize product data
   const normalizeProductData = (product) => {
     if (!product) return null;
 
@@ -196,7 +185,7 @@ const Products = () => {
     };
   };
 
-  // Fetch paginated products from new endpoint
+  // Fetch products
   const fetchProducts = useCallback(async () => {
     if (isFetchingRef.current) return;
 
@@ -208,7 +197,7 @@ const Products = () => {
         pageNumber: currentPage,
         pageSize: 6,
         category: activeCategory === 'All' || activeCategory === 'all' ? '' : activeCategory,
-        searchTerm: searchTerm.trim(),
+        searchTerm: searchQuery.trim(), // Use committed search query
       });
 
       const response = await axiosInstance.get(
@@ -216,7 +205,6 @@ const Products = () => {
       );
 
       const data = response.data;
-
       const productsArray = data.Products || data.products || [];
       const normalized = productsArray.map(normalizeProductData);
 
@@ -227,7 +215,7 @@ const Products = () => {
       setHasPreviousPage(data.HasPreviousPage || data.hasPreviousPage || false);
 
       if (normalized.length === 0 && currentPage === 1) {
-        toast.info('No products found. Add your first product!');
+        toast.info(searchQuery ? 'No products match your search.' : 'No products found.');
       }
     } catch (error) {
       handleApiError(error, 'Failed to load products');
@@ -238,30 +226,37 @@ const Products = () => {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [currentPage, activeCategory, searchTerm, handleApiError]);
+  }, [currentPage, activeCategory, searchQuery, handleApiError]);
 
-  // Trigger fetch when page/category/search changes
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Reset to page 1 when category or search changes
-  const handleCategoryFilter = (categoryId) => {
-    setActiveCategory(categoryId);
+  // Reset page when filters change
+  const handleCategoryFilter = (category) => {
+    setActiveCategory(category);
     setCurrentPage(1);
   };
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
-    if (!e.target.value.trim()) {
+  };
+
+  const handleSearchSubmit = (e) => {
+    if (e.type === 'click' || (e.type === 'keydown' && e.key === 'Enter')) {
+      e.preventDefault();
+      const trimmed = searchTerm.trim();
+      if (trimmed === searchQuery) return; // No change
+
+      setSearchQuery(trimmed);
       setCurrentPage(1);
     }
   };
 
-  const handleSearchSubmit = (e) => {
-    if (e.key === 'Enter' || e.type === 'click') {
-      setCurrentPage(1);
-    }
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setSearchQuery('');
+    setCurrentPage(1);
   };
 
   const handlePageChange = (newPage) => {
@@ -275,7 +270,6 @@ const Products = () => {
       toast.error('Please create your vendor profile first');
       return;
     }
-
     if (availableCategories.length === 0) {
       toast.error('No categories available for your business type');
       return;
@@ -294,13 +288,7 @@ const Products = () => {
   };
 
   const handleUpdateProduct = (product) => {
-    if (!vendorProfile) {
-      toast.error('Profile required to update products');
-      return;
-    }
-
     setEditingProduct(product);
-
     const existingImageUrls = (product.images || []).map((img) => img.imageUrl);
 
     setNewProduct({
@@ -318,19 +306,15 @@ const Products = () => {
   const validateProduct = () => {
     if (!newProduct.productName?.trim()) return toast.error('Product Name is required!'), false;
     if (!newProduct.productCategory?.trim()) return toast.error('Category is required!'), false;
-    
-    // Validate category is in available categories
-    // For "All" business type vendors, they can use any category including "All"
-    // For specific business type vendors, they can only use that specific category
+
     const validCategories = availableCategories;
-    
     if (!validCategories.includes(newProduct.productCategory)) {
-      toast.error('Selected category is not available for your business type');
+      toast.error('Selected category is not allowed for your business type');
       return false;
     }
-    
+
     if (!newProduct.description?.trim()) return toast.error('Description is required!'), false;
-    if (newProduct.price <= 0) return toast.error('Price must be > 0!'), false;
+    if (newProduct.price <= 0) return toast.error('Price must be greater than 0!'), false;
     if (newProduct.quantity < 0) return toast.error('Quantity cannot be negative!'), false;
     if (newProduct.images.length === 0) return toast.error('At least 1 image required!'), false;
     if (newProduct.images.length > 3) return toast.error('Maximum 3 images allowed!'), false;
@@ -587,7 +571,7 @@ const Products = () => {
     );
   };
 
-  // Show profile creation prompt if no profile
+  // Profile required view
   if (!profileLoading && !vendorProfile) {
     return (
       <div className="flex min-h-screen bg-gray-100">
@@ -597,15 +581,14 @@ const Products = () => {
             <h1 className="text-3xl font-bold text-gray-800">My Products</h1>
             <p className="text-gray-600 mt-2">Manage your product inventory</p>
           </header>
-          
+
           <div className="bg-white rounded-xl shadow-md p-8 text-center">
             <div className="w-24 h-24 bg-yellow-100 rounded-full mx-auto mb-6 flex items-center justify-center">
               <span className="text-4xl">📋</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-4">Profile Required</h3>
             <p className="text-gray-600 mb-6">
-              You need to create your vendor profile before you can add products.
-              Your profile determines which product categories you can use.
+              You need to create your vendor profile before adding products.
             </p>
             <button
               onClick={() => navigate('/vendor-dashboard', { state: { openProfileModal: true } })}
@@ -619,7 +602,6 @@ const Products = () => {
     );
   }
 
-  // Check if vendor has "All" business type
   const isAllBusinessType = vendorProfile?.BusinessType === 'All';
 
   return (
@@ -629,44 +611,61 @@ const Products = () => {
         <header className="mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">My Products</h1>
-            <p className="text-gray-600 mt-2">
-              Manage your product inventory
-              {vendorProfile && (
-                <span className="ml-2 text-sm bg-[#586330]/10 text-[#586330] px-2 py-1 rounded">
-                  Business: {vendorProfile.BusinessType === 'All' ? 'Multiple Categories' : vendorProfile.BusinessType}
-                </span>
-              )}
-            </p>
+            <p className="text-gray-600 mt-2">Manage your product inventory</p>
           </div>
           <button
             onClick={handleAddProduct}
             disabled={!vendorProfile || availableCategories.length === 0}
-            className={`${!vendorProfile || availableCategories.length === 0 ? 'opacity-50 cursor-not-allowed' : ''} bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition flex items-center space-x-2 font-medium`}
-            title={!vendorProfile ? 'Create profile first' : availableCategories.length === 0 ? 'No categories available' : 'Add new product'}
+            className={`${
+              !vendorProfile || availableCategories.length === 0
+                ? 'opacity-50 cursor-not-allowed'
+                : ''
+            } bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition flex items-center space-x-2 font-medium`}
+            title={
+              !vendorProfile
+                ? 'Create profile first'
+                : availableCategories.length === 0
+                ? 'No categories available'
+                : 'Add new product'
+            }
           >
             <span className="text-lg">+</span>
             <span>Add Product</span>
           </button>
         </header>
 
-        {/* Search */}
+        {/* Search Bar */}
         <div className="mb-6">
-          <div className="flex gap-4">
-            <input
-              type="text"
-              placeholder="Search by name, category, description..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              onKeyPress={handleSearchSubmit}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330]"
-            />
-            <button
-              onClick={handleSearchSubmit}
-              className="px-6 py-3 bg-[#586330] text-white rounded-lg hover:bg-[#586330]/80 font-medium"
-            >
-              Search
-            </button>
-          </div>
+          <form onSubmit={handleSearchSubmit} className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search by product name (first word only)..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onKeyDown={handleSearchSubmit}
+                className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330] focus:border-transparent"
+              />
+              <svg className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+           
+          </form>
+          {searchQuery && (
+            <p className="text-sm text-gray-600 mt-2">
+              Showing results for: <strong>"{searchQuery}"</strong>
+            </p>
+          )}
         </div>
 
         {/* Category Filters */}
@@ -677,58 +676,57 @@ const Products = () => {
           </div>
         ) : availableCategories.length > 0 ? (
           <div className="mb-8">
-            <p className="text-sm text-gray-600 mb-2">
-              {isAllBusinessType 
-                ? 'Available categories (Multiple Categories Business):' 
+            {/* <p className="text-sm text-gray-600 mb-2">
+              {isAllBusinessType
+                ? 'Available categories (General)'
                 : `Available category (${vendorProfile?.BusinessType} Business):`}
-            </p>
+            </p> */}
             <div className="flex gap-4 flex-wrap">
-              {/* Show available categories including "All" if applicable */}
               {availableCategories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => handleCategoryFilter(cat)}
+                  disabled={!!searchQuery} // Disable category filter when searching
                   className={`px-4 py-2 rounded-lg font-medium transition ${
-                    activeCategory === cat
+                    searchQuery
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : activeCategory === cat
                       ? 'bg-[#586330] text-white'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
                   }`}
-                  title={cat === 'All' ? 'Show all products' : `Show ${cat} products`}
                 >
                   {cat}
                 </button>
               ))}
             </div>
+           
           </div>
         ) : (
           <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-yellow-800">
-              No categories available for your business type "{vendorProfile?.BusinessType}".
-              Please contact admin or update your profile.
+              No categories available for your business type.
             </p>
           </div>
         )}
 
-        {/* Loading */}
+        {/* Loading, Summary, Grid, Empty State, Pagination */}
         {loading && (
           <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-[#586330] border-t-transparent"></div>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-[#586330]"></div>
             <p className="mt-4 text-lg text-gray-600">Loading products...</p>
           </div>
         )}
 
-        {/* Summary */}
-        {!loading && (
+        {/* {!loading && (
           <div className="mb-6 flex justify-between items-center">
             <span className="text-sm text-gray-600">
-              Showing page {currentPage} of {totalPages} ({totalCount} products)
-              {activeCategory !== 'All' && activeCategory !== 'all' && ` in "${activeCategory}" category`}
-              {(activeCategory === 'All' || activeCategory === 'all') && ' (All Categories)'}
+              Showing {totalCount} product{totalCount !== 1 ? 's' : ''}
+              {searchQuery && ` matching "${searchQuery}"`}
+              {activeCategory !== 'all' && activeCategory !== 'All' && !searchQuery && ` in "${activeCategory}"`}
             </span>
           </div>
-        )}
+        )} */}
 
-        {/* Products Grid */}
         {!loading && products.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {products.map((product) => (
@@ -737,27 +735,22 @@ const Products = () => {
           </div>
         )}
 
-        {/* Empty State */}
         {!loading && products.length === 0 && (
           <div className="text-center py-16 bg-white rounded-xl shadow-md">
             <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center text-5xl">
               📦
             </div>
             <h3 className="text-xl font-semibold text-gray-600">
-              {searchTerm || (activeCategory !== 'All' && activeCategory !== 'all') ? 'No products found' : 'No products yet'}
+              {searchQuery ? 'No matching products found' : 'No products yet'}
             </h3>
             <p className="text-gray-500 mt-2">
-              {searchTerm
-                ? 'Try different keywords'
-                : activeCategory !== 'All' && activeCategory !== 'all'
-                ? `No items in "${activeCategory}" category`
+              {searchQuery
+                ? `No product starts with "${searchQuery}"`
                 : 'Start by adding your first product'}
             </p>
-            
           </div>
         )}
 
-        {/* Pagination */}
         {!loading && totalPages > 1 && (
           <div className="flex justify-center items-center mt-10 space-x-2">
             <button
@@ -788,7 +781,7 @@ const Products = () => {
           </div>
         )}
 
-        {/* Modals - Pass available categories (including "All" if applicable) */}
+        {/* Modals */}
         {showAddModal && (
           <ProductModal
             title="Add New Product"
@@ -801,7 +794,7 @@ const Products = () => {
             }}
             handleImageUpload={handleImageUpload}
             handleRemoveImage={handleRemoveImage}
-            categories={availableCategories} // Use all available categories
+            categories={availableCategories}
             isSaving={saving}
           />
         )}
@@ -819,7 +812,7 @@ const Products = () => {
             }}
             handleImageUpload={handleImageUpload}
             handleRemoveImage={handleRemoveImage}
-            categories={availableCategories} // Use all available categories
+            categories={availableCategories}
             isSaving={saving}
             editingProduct={editingProduct}
           />

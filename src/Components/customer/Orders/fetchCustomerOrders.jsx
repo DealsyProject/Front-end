@@ -300,7 +300,7 @@ export default function CustomerOrders() {
                                   <option value="">-- Select Reason --</option>
                                   <option value="Damaged product">Damaged product</option>
                                   <option value="Wrong item received">Wrong item received</option>
-                                  <option value="Defective item">Defective item</option>
+                                  <option value="Defective item">Not Liked Product</option>
                                   <option value="Does not match description">Does not match description</option>
                                   <option value="Changed my mind">Changed my mind</option>
                                   <option value="Other">Other</option>

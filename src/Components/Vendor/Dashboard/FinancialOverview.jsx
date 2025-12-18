@@ -31,9 +31,7 @@ const FinancialCard = ({ item }) => {
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <div className={`w-10 h-10 ${colorClasses[item.color] || 'bg-gray-100 text-gray-600'} rounded-full flex items-center justify-center text-xl`}>
-              {item.icon || '💰'}
-            </div>
+            
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">{item.title}</p>
               <p className="text-2xl font-bold text-gray-800 mb-1">{item.value}</p>
@@ -44,11 +42,7 @@ const FinancialCard = ({ item }) => {
             <p className="text-xs text-gray-500 mb-1">{item.subtitle}</p>
           )}
           
-          {item.trend && (
-            <p className={`text-xs font-medium ${trendColor}`}>
-              {item.trend}
-            </p>
-          )}
+          
         </div>
       </div>
     </div>

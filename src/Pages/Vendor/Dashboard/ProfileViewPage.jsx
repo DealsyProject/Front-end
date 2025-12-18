@@ -257,12 +257,12 @@ const ProfileViewPage = () => {
                     <span className="text-lg">{contactInfo.CompanyName}</span>
                   </div>
                 )}
-                {/* Rating Display */}
+                {/* Rating Display
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                   <span className="font-semibold">{stats.customerRating}</span>
                   <span className="text-gray-500">({formatNumber(vendorStats.totalCustomers)} reviews)</span>
-                </div>
+                </div> */}
               </div>
             </div>
 

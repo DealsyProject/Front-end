@@ -51,26 +51,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Fetch orders when My Orders tab is selected
-  useEffect(() => {
-    if (active === "My Orders") {
-      fetchOrders();
-    }
-  }, [active]);
-
-  const fetchOrders = async () => {
-    try {
-      setOrdersLoading(true);
-      const response = await axiosInstance.get("/Order/customer-orders");
-      setOrders(response.data.data || response.data || []);
-    } catch (err) {
-      console.error("Error fetching orders:", err);
-      setOrders([]);
-    } finally {
-      setOrdersLoading(false);
-    }
-  };
-
+  
   // Upload Profile Photo
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];

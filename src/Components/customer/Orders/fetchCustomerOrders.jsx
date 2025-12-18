@@ -180,7 +180,7 @@ export default function CustomerOrders() {
             <p className="font-bold text-amber-900 text-lg">Return Policy</p>
             <p className="text-amber-800 mt-2">
               You can request a return <strong>only within 1 hour</strong> after delivery.
-              Once submitted, the order status will change to <strong>"Returned"</strong>.
+            
             </p>
           </div>
         </div>

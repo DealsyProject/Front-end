@@ -1,5 +1,6 @@
-import { BrowserRouter as Router, Routes, Route,  } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, } from 'react-router-dom';
 
+import ProtectedRoute from "./routes/ProtectedRoute";
 
 
 //admin
@@ -68,32 +69,29 @@ function App() {
       <Routes>
 
         {/* admin */}
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/productPage" element={<ProductPage />} />
-        <Route path="/orders" element={<OrdersPage />} />
-        <Route path="/Transaction" element={<TransactionsPage />} />
-        <Route path="/user" element={<UserManagement />} />
-        <Route path="/Vendors" element={<PendingVendors />} />
-     
-        <Route path="/support-team" element={<SupportTeamPage />} />
-
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/productPage" element={<ProductPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/Transaction" element={<TransactionsPage />} />
+          <Route path="/user" element={<UserManagement />} />
+          <Route path="/Vendors" element={<PendingVendors />} />
+          <Route path="/support-team" element={<SupportTeamPage />} />
+        </Route>
 
 
         {/* Vendor */}
-       
+        <Route element={<ProtectedRoute allowedRoles={["vendor"]} />}>
+          <Route path="/vendor-dashboard" element={<Dashboard />} />
+          <Route path="/vendor/profile" element={<ProfileViewPage />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/invoices" element={<Invoices />} />
+          <Route path="/payments" element={<Payments />} />
+        </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/vendor-register" element={<VendorRegister />} />
-        
-      
-        <Route path="/vendor-dashboard" element={<Dashboard />} />
-       <Route path="/vendor/profile" element={<ProfileViewPage />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/customers" element={<Customers />} />
-        <Route path="/invoices" element={<Invoices />} />
-        <Route path="/payments" element={<Payments />} />
-
-
 
         {/* Customer  */}
         <Route path="/" element={<CustomerHome />} />
@@ -109,19 +107,22 @@ function App() {
 
 
         {/* Support Team */}
-        <Route path="/customerchat" element={<CustomerChat />}/>
-        <Route path="/support-Customerchatcenter" element={<SupportChatCustomer/>}/>
-        <Route path="/support-custemervenderdetails" element={<CustemerVenderDetails />}/>
-        <Route path="/support-returnrefundtracker" element={<ReturnRefundTracker />}/>
-        <Route path="/support-faq-options" element={<FaqOption />}/>
-        <Route path="/support-emailsupport" element={<EmailSupport />}/>
-        <Route path="/support-supportchattoadmin" element={<SupportChatToAdmin />}/>
-        <Route path="/support-adminchattosupport" element={<AdminChatToSupport />}/>
-        <Route path="/support-profile" element={<SupportProfile />}/>
-        
+        <Route element={<ProtectedRoute allowedRoles={["supportteam"]} />}>
 
-         </Routes>
-         <Toaster position="top-right" />
+          <Route path="/customerchat" element={<CustomerChat />} />
+          <Route path="/support-Customerchatcenter" element={<SupportChatCustomer />} />
+          <Route path="/support-custemervenderdetails" element={<CustemerVenderDetails />} />
+          <Route path="/support-returnrefundtracker" element={<ReturnRefundTracker />} />
+          <Route path="/support-faq-options" element={<FaqOption />} />
+          <Route path="/support-emailsupport" element={<EmailSupport />} />
+          <Route path="/support-supportchattoadmin" element={<SupportChatToAdmin />} />
+          <Route path="/support-adminchattosupport" element={<AdminChatToSupport />} />
+          <Route path="/support-profile" element={<SupportProfile />} />
+        </Route>
+
+
+      </Routes>
+      <Toaster position="top-right" />
     </Router>
   );
 }

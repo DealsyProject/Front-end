@@ -20,9 +20,23 @@ axiosInstance.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
-      localStorage.clear();
-      window.location.href = '/login';
-    }
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('currentUser');
+
+  const currentPath = window.location.pathname;
+
+  // Prevent forced redirect on public pages
+  if (
+    !currentPath.startsWith('/login') &&
+    !currentPath.startsWith('/register') &&
+    !currentPath.startsWith('/customerproducts') &&
+    !currentPath.startsWith('/customer/product') &&
+    currentPath !== '/'
+  ) {
+    window.location.href = '/login';
+  }
+}
+
     return Promise.reject(error);
   }
 );

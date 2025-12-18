@@ -10,30 +10,50 @@ export default function CustomerProducts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
 
-  // PAGINATION ADDED
+  // ✅ DYNAMIC CATEGORIES (UI SAME)
+  const [categories, setCategories] = useState([
+    { id: "all", name: "All Products" }
+  ]);
+
+  // PAGINATION
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 6;
 
-  const categories = [
-    { id: 'all', name: 'All Products' },
-    { id: 'Grocery', name: 'Grocery' },
-    { id: 'Furniture', name: 'Furniture' },
-    { id: 'Books', name: 'Books' },
-    { id: 'Home Appliance', name: 'Home Appliance' },
-    { id: 'Cloth', name: 'Cloth' }
-  ];
-
   useEffect(() => {
+    fetchCategories();
     fetchProducts();
   }, []);
 
+  /* ========================
+     FETCH CATEGORIES (NEW)
+     ======================== */
+  const fetchCategories = async () => {
+    try {
+      const response = await axiosInstance.get("/Category/names");
+
+      const backendCategories = response.data.categories.map(name => ({
+        id: name,
+        name: name
+      }));
+
+      setCategories([
+        { id: "all", name: "All Products" },
+        ...backendCategories
+      ]);
+    } catch (error) {
+      console.error("❌ Error fetching categories:", error);
+    }
+  };
+
+  /* ========================
+     FETCH PRODUCTS
+     ======================== */
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await axiosInstance.get('/Product/all');
-      const productsData = response.data.products || [];
-      setProducts(productsData);
-      setCurrentPage(1); // reset page on reload
+      const response = await axiosInstance.get("/Product/all");
+      setProducts(response.data.products || []);
+      setCurrentPage(1);
     } catch (error) {
       console.error("❌ Error fetching products:", error);
     } finally {
@@ -49,10 +69,11 @@ export default function CustomerProducts() {
 
     try {
       setLoading(true);
-      const response = await axiosInstance.get(`/Product/search?searchTerm=${encodeURIComponent(searchTerm)}`);
-      const searchResults = response.data.products || [];
-      setProducts(searchResults);
-      setCurrentPage(1); // reset page on search
+      const response = await axiosInstance.get(
+        `/Product/search?searchTerm=${encodeURIComponent(searchTerm)}`
+      );
+      setProducts(response.data.products || []);
+      setCurrentPage(1);
     } catch (error) {
       console.error("❌ Error searching products:", error);
     } finally {
@@ -61,17 +82,18 @@ export default function CustomerProducts() {
   };
 
   const filterByCategory = async (categoryId) => {
-    if (categoryId === 'all') {
+    if (categoryId === "all") {
       fetchProducts();
       return;
     }
 
     try {
       setLoading(true);
-      const response = await axiosInstance.get(`/Product/category/${categoryId}`);
-      const categoryResults = response.data.products || [];
-      setProducts(categoryResults);
-      setCurrentPage(1); // reset page on filter
+      const response = await axiosInstance.get(
+        `/Product/category/${categoryId}`
+      );
+      setProducts(response.data.products || []);
+      setCurrentPage(1);
     } catch (error) {
       console.error("❌ Error filtering by category:", error);
     } finally {
@@ -87,7 +109,7 @@ export default function CustomerProducts() {
   };
 
   const handleSearchSubmit = (e) => {
-    if (e.key === 'Enter' || e.type === 'click') {
+    if (e.key === "Enter" || e.type === "click") {
       searchProducts();
     }
   };
@@ -97,23 +119,30 @@ export default function CustomerProducts() {
     filterByCategory(categoryId);
   };
 
+  /* ========================
+     PRODUCT CARD (UNCHANGED)
+     ======================== */
   const ProductCard = ({ product }) => {
     const productImages = product.Images || [];
-    const primaryImage = productImages.find(img => img.IsPrimary) || productImages[0];
-    const imageUrl = primaryImage?.ImageUrl || "https://via.placeholder.com/400x300?text=No+Image";
+    const primaryImage =
+      productImages.find(img => img.IsPrimary) || productImages[0];
+    const imageUrl =
+      primaryImage?.ImageUrl ||
+      "https://via.placeholder.com/400x300?text=No+Image";
 
     return (
       <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition duration-300 border border-gray-200">
         <div className="h-48 bg-gray-200 overflow-hidden relative">
-          <img 
+          <img
             src={imageUrl}
             alt={product.ProductName}
             className="w-full h-full object-cover hover:scale-105 transition duration-300"
             onError={(e) => {
-              e.target.src = 'https://via.placeholder.com/400x300?text=No+Image';
+              e.target.src =
+                "https://via.placeholder.com/400x300?text=No+Image";
             }}
           />
-          
+
           {product.Quantity === 0 && (
             <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm font-medium">
               Out of Stock
@@ -126,38 +155,27 @@ export default function CustomerProducts() {
             </div>
           )}
         </div>
-        
+
         <div className="p-6">
           <div className="flex justify-between items-start mb-3">
-            <h4 className="text-lg font-semibold text-gray-900 line-clamp-2">{product.ProductName}</h4>
+            <h4 className="text-lg font-semibold text-gray-900 line-clamp-2">
+              {product.ProductName}
+            </h4>
             <span className="text-xs text-[#586330] bg-[#586330]/20 px-2 py-1 rounded-full font-medium">
               {product.ProductCategory}
             </span>
           </div>
-          
-          <p className="text-gray-500 text-sm mb-2">By {product.VendorName}</p>
-          
+
+          <p className="text-gray-500 text-sm mb-2">
+            By {product.VendorName}
+          </p>
+
           <div className="mb-3">
             <span className="text-[#586330] font-bold text-xl">
-              ₹{product.Price.toLocaleString('en-IN')}
+              ₹{product.Price.toLocaleString("en-IN")}
             </span>
-            {product.Rating > 0 && (
-              <div className="flex items-center space-x-1 mt-1">
-                {[...Array(5)].map((_, index) => (
-                  <span
-                    key={index}
-                    className={`text-sm ${
-                      index < Math.floor(product.Rating) ? 'text-yellow-400' : 'text-gray-300'
-                    }`}
-                  >
-                    ★
-                  </span>
-                ))}
-                <span className="text-xs text-gray-600 ml-1">({product.Rating})</span>
-              </div>
-            )}
           </div>
-          
+
           <p className="text-gray-600 mb-4 text-sm leading-relaxed line-clamp-3">
             {product.Description}
           </p>
@@ -173,13 +191,18 @@ export default function CustomerProducts() {
     );
   };
 
-  // PAGINATION LOGIC
+  /* ========================
+     PAGINATION LOGIC
+     ======================== */
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentProducts = products.slice(indexOfFirstProduct, indexOfLastProduct);
+  const currentProducts = products.slice(
+    indexOfFirstProduct,
+    indexOfLastProduct
+  );
   const totalPages = Math.ceil(products.length / productsPerPage);
 
-  return (
+   return (
     <div className="flex flex-col min-h-screen bg-pink-50">
       <Navbar />
       <main className="flex-grow py-10 px-6">

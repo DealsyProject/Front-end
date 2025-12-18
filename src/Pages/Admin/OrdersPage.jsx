@@ -216,7 +216,7 @@ export default function OrderPage() {
             <strong>Vendor Payment Successful!</strong><br />
             Paid to Vendor: <strong>₹{parseFloat(vendorAmount).toFixed(2)}</strong><br />
             Platform Commission: <strong>₹{parseFloat(commissionAmount).toFixed(2)}</strong><br />
-            <small>Order #{selectedOrder.Id}</small>
+            <small>Order {selectedOrder.Id}</small>
           </div>,
           { autoClose: 8000 }
         );
@@ -339,8 +339,8 @@ export default function OrderPage() {
 
                     return (
                       <tr key={order.Id} className="hover:bg-gray-50 transition">
-                        <td className="px-8 py-6 font-bold text-lg">#{order.Id}</td>
-                        <td className="px-8 py-6 font-medium text-gray-900">Customer #{order.CustomerId}</td>
+                        <td className="px-8 py-6 font-bold text-lg">{order.Id}</td>
+                        <td className="px-8 py-6 font-medium text-gray-900">Customer {order.CustomerId}</td>
                         <td className="px-8 py-6 font-bold text-2xl text-[#586330]">₹{order.TotalAmount?.toFixed(2)}</td>
                         <td className="px-8 py-6 text-gray-700">{formatDate(order.DeliveredDate)}</td>
                         <td className="px-8 py-6">
@@ -392,7 +392,7 @@ export default function OrderPage() {
               <div className="p-10 border-b border-gray-200">
                 <div className="flex justify-between items-center">
                   <h3 className="text-4xl font-bold text-gray-900">
-                    Return Request - Order #{selectedOrder.Id}
+                    Return Request - Order {selectedOrder.Id}
                   </h3>
                   <button onClick={() => setShowReturnModal(false)} className="text-4xl text-gray-500 hover:text-gray-700">
                     ×
@@ -439,7 +439,7 @@ export default function OrderPage() {
                       <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-8 rounded-xl border border-amber-300 text-center">
                         <p className="text-2xl font-bold mb-2">Refund Amount</p>
                         <p className="text-5xl font-bold text-red-600">
-                          ₹{(selectedOrder.RefundAmount || selectedOrder.TotalAmount)?.toFixed(2)}
+                          ₹{(selectedOrder.TotalAmount)?.toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -677,7 +677,7 @@ export default function OrderPage() {
             <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
               <div className="p-10 border-b border-gray-200">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-4xl font-bold text-gray-900">Order #{selectedOrder.Id} - Confirmed</h3>
+                  <h3 className="text-4xl font-bold text-gray-900">Order {selectedOrder.Id} - Confirmed</h3>
                   <button onClick={() => setShowConfirmedModal(false)} className="text-4xl text-gray-500 hover:text-gray-700">×</button>
                 </div>
 
@@ -717,7 +717,7 @@ export default function OrderPage() {
                    <div className="bg-gray-50 p-8 rounded-2xl border border-gray-300">
                       <h4 className="text-2xl font-bold mb-6">Order Summary</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                        <div><p className="text-gray-600">Order ID</p><p className="text-xl font-bold">#{selectedOrder.Id}</p></div>
+                        <div><p className="text-gray-600">Order ID</p><p className="text-xl font-bold">{selectedOrder.Id}</p></div>
                         <div><p className="text-gray-600">Total Amount</p><p className="text-2xl font-bold text-[#586330]">₹{selectedOrder.TotalAmount?.toFixed(2)}</p></div>
                         <div><p className="text-gray-600">Delivered On</p><p className="text-lg">{formatDate(selectedOrder.DeliveredDate)}</p></div>
                       </div>

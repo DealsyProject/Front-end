@@ -24,6 +24,7 @@ export default function OrderPage() {
   const [showConfirmedModal, setShowConfirmedModal] = useState(false);
   const [processingRefund, setProcessingRefund] = useState(false);
   const [processingVendorPayment, setProcessingVendorPayment] = useState(false);
+  const [initiatingShipping, setInitiatingShipping] = useState(false);
 
   // Tabs
   const [activeTab, setActiveTab] = useState("details"); // return modal
@@ -33,9 +34,6 @@ export default function OrderPage() {
   const [showShippingForm, setShowShippingForm] = useState(false);
   const [carrierName, setCarrierName] = useState("");
   const [trackingId, setTrackingId] = useState("");
-
-  // Persistent shipping details per order
-  const [vendorShippingMap, setVendorShippingMap] = useState({}); // { orderId: { carrierName, trackingId, submittedAt } }
 
   useEffect(() => {
     fetchDeliveredOrders();
@@ -54,153 +52,210 @@ export default function OrderPage() {
     }
   };
 
-  const handlePayVendor = async () => {
+ const handleSubmitShipping = async () => {
+  if (!selectedOrder) {
+    toast.error("No order selected");
+    return;
+  }
+
+  if (!carrierName.trim() || !trackingId.trim()) {
+    toast.error("Please enter both Carrier Name and Tracking ID");
+    return;
+  }
+
+  try {
+    setInitiatingShipping(true);
+    
+    console.log("Sending shipping data:", {
+      ReturnId: selectedOrder.ReturnId,
+      CarrierName: carrierName.trim(),
+      TrackingId: trackingId.trim()
+    });
+    
+    // Make API call to initiate return shipping
+    const response = await axiosInstance.post("/Order/return/initiate-shipping", {
+      ReturnId: selectedOrder.ReturnId,
+      CarrierName: carrierName.trim(),
+      TrackingId: trackingId.trim()
+    });
+
+    console.log("API Response:", response.data);
+    
+    // Check both "Success" and "success" to handle case differences
+    const isSuccess = response.data.Success || response.data.success;
+    
+    if (isSuccess) {
+      const successMessage = response.data.Message || response.data.message || "Return shipping initiated successfully!";
+      toast.success(successMessage);
+      
+      // Update the selected order with shipping info
+      setSelectedOrder(prev => ({
+        ...prev,
+        TrackingId: trackingId.trim(),
+        CarrierName: carrierName.trim(),
+        Status: "Shipped"
+      }));
+
+      // Refresh the orders list
+      await fetchDeliveredOrders();
+      
+      // Close the form
+      setShowShippingForm(false);
+      setCarrierName("");
+      setTrackingId("");
+    } else {
+      const errorMessage = response.data.Message || response.data.message || "Failed to initiate shipping";
+      toast.error(errorMessage);
+    }
+  } catch (error) {
+    console.error("Error initiating return shipping:", error);
+    console.error("Error response:", error.response);
+    toast.error(
+      error.response?.data?.message || 
+      error.response?.data?.Message || 
+      error.response?.data?.error || 
+      "Failed to initiate return shipping"
+    );
+  } finally {
+    setInitiatingShipping(false);
+  }
+};
+  const handleInitiateShipping = () => {
+    // Reset form and show it
+    setCarrierName("");
+    setTrackingId("");
+    setShowShippingForm(true);
+  };
+
+ const handleProcessRefund = async () => {
   if (!selectedOrder) return;
 
-  const totalAmount = selectedOrder.TotalAmount;
-  const estimatedVendorAmount = totalAmount * 0.8;
-  const estimatedCommission = totalAmount * 0.2;
+  const refundAmount = selectedOrder.RefundAmount || selectedOrder.TotalAmount;
 
   const confirmed = window.confirm(
-    `Pay vendor approximately ₹${estimatedVendorAmount.toFixed(2)} (80% of ₹${totalAmount.toFixed(2)})?\n` +
-    `Platform commission: ₹${estimatedCommission.toFixed(2)} (20%)\n\n` +
-    `Order ID: ${selectedOrder.Id}`
+    `Process refund of ₹${refundAmount.toFixed(2)} to customer?\n\n` +
+    `Order ID: ${selectedOrder.Id}\n` +
+    `Reason: "${selectedOrder.Reason}"`
   );
 
   if (!confirmed) return;
 
   try {
-    setProcessingVendorPayment(true);
+    setProcessingRefund(true);
 
-    const paymentData = { OrderId: selectedOrder.Id };
+    console.log("Processing refund with data:", {
+      ReturnId: selectedOrder.ReturnId,
+      PaymentId: selectedOrder.PaymentId,
+      RefundAmount: refundAmount,
+      Reason: selectedOrder.Reason
+    });
 
-    const response = await axiosInstance.post("/payment/vendor-payment", paymentData);
+    const refundData = {
+      ReturnId: selectedOrder.ReturnId,
+      PaymentId: selectedOrder.PaymentId,
+      RefundAmount: refundAmount,
+      Reason: selectedOrder.Reason,
+    };
 
-    if (response.data.success) {
-      const { vendorAmount, commissionAmount } = response.data;
+    const response = await axiosInstance.post("/payment/refund", refundData);
+    
+    console.log("Refund response:", response.data);
 
-      toast.success(
-        <div className="text-left">
-          <strong>Vendor Payment Successful!</strong><br />
-          Paid to Vendor: <strong>₹{parseFloat(vendorAmount).toFixed(2)}</strong><br />
-          Platform Commission: <strong>₹{parseFloat(commissionAmount).toFixed(2)}</strong><br />
-          <small>Order #{selectedOrder.Id}</small>
-        </div>,
-        { autoClose: 8000 }
-      );
-
-      // Update the modal's selectedOrder immediately with correct field names
-      setSelectedOrder(prev => ({
-  ...prev,
-  VendorPaymentStatus: "Paid",
-  VendorPayoutAmount: vendorAmount,
-  CommissionAmount: commissionAmount,
-  VendorPayoutDate: new Date().toISOString()
-}));
-
-      // Refresh the full list so table also updates
+    // Check both uppercase and lowercase success
+    if (response.data.success || response.data.Success) {
+      const refundId = response.data.razorpayRefundId || response.data.RazorpayRefundId;
+      const message = response.data.message || response.data.Message || "Refund processed successfully!";
+      
+      toast.success(`${message} Razorpay ID: ${refundId}`);
       await fetchDeliveredOrders();
+      setShowReturnModal(false);
     } else {
-      toast.error(response.data.message || "Vendor payment failed.");
+      const errorMessage = response.data.message || response.data.Message || "Refund failed.";
+      toast.error(errorMessage);
     }
   } catch (error) {
-    const message = error.response?.data?.message || "Failed to process vendor payment.";
-    toast.error(message);
+    console.error("Refund error:", error);
+    console.error("Error response:", error.response?.data);
+    
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.Message || 
+                        "Failed to process refund.";
+    toast.error(errorMessage);
   } finally {
-    setProcessingVendorPayment(false);
+    setProcessingRefund(false);
   }
 };
 
-  // Refund Handler
-  const handleProcessRefund = async () => {
+  const handlePayVendor = async () => {
     if (!selectedOrder) return;
 
-    const refundAmount = selectedOrder.RefundAmount || selectedOrder.TotalAmount;
+    const totalAmount = selectedOrder.TotalAmount;
+    const estimatedVendorAmount = totalAmount * 0.8;
+    const estimatedCommission = totalAmount * 0.2;
 
     const confirmed = window.confirm(
-      `Process refund of ₹${refundAmount.toFixed(2)} to customer?\n\n` +
-      `Order ID: ${selectedOrder.Id}\n` +
-      `Reason: "${selectedOrder.Reason}"`
+      `Pay vendor approximately ₹${estimatedVendorAmount.toFixed(2)} (80% of ₹${totalAmount.toFixed(2)})?\n` +
+      `Platform commission: ₹${estimatedCommission.toFixed(2)} (20%)\n\n` +
+      `Order ID: ${selectedOrder.Id}`
     );
 
     if (!confirmed) return;
 
     try {
-      setProcessingRefund(true);
+      setProcessingVendorPayment(true);
 
-      const refundData = {
-        ReturnId: selectedOrder.ReturnId,
-        PaymentId: selectedOrder.PaymentId,
-        RefundAmount: refundAmount,
-        Reason: selectedOrder.Reason,
-      };
+      const paymentData = { OrderId: selectedOrder.Id };
 
-      const response = await axiosInstance.post("/payment/refund", refundData);
+      const response = await axiosInstance.post("/payment/vendor-payment", paymentData);
 
       if (response.data.success) {
-        toast.success(`Refund processed successfully! Razorpay ID: ${response.data.razorpayRefundId}`);
+        const { vendorAmount, commissionAmount } = response.data;
+
+        toast.success(
+          <div className="text-left">
+            <strong>Vendor Payment Successful!</strong><br />
+            Paid to Vendor: <strong>₹{parseFloat(vendorAmount).toFixed(2)}</strong><br />
+            Platform Commission: <strong>₹{parseFloat(commissionAmount).toFixed(2)}</strong><br />
+            <small>Order #{selectedOrder.Id}</small>
+          </div>,
+          { autoClose: 8000 }
+        );
+
+        setSelectedOrder(prev => ({
+          ...prev,
+          VendorPaymentStatus: "Paid",
+          VendorPayoutAmount: vendorAmount,
+          CommissionAmount: commissionAmount,
+          VendorPayoutDate: new Date().toISOString()
+        }));
+
         await fetchDeliveredOrders();
-        setShowReturnModal(false);
       } else {
-        toast.error(response.data.message || "Refund failed.");
+        toast.error(response.data.message || "Vendor payment failed.");
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to process refund.");
+      const message = error.response?.data?.message || "Failed to process vendor payment.";
+      toast.error(message);
     } finally {
-      setProcessingRefund(false);
+      setProcessingVendorPayment(false);
     }
-  };
-
-  // Shipping Handlers
-  const handleInitiateShipping = () => setShowShippingForm(true);
-
-  const handleSubmitShipping = () => {
-    if (!carrierName.trim() || !trackingId.trim()) {
-      toast.error("Please enter both Carrier Name and Tracking ID");
-      return;
-    }
-
-    const shippingInfo = {
-      carrierName: carrierName.trim(),
-      trackingId: trackingId.trim(),
-      submittedAt: new Date().toLocaleString("en-IN"),
-    };
-
-    setVendorShippingMap(prev => ({
-      ...prev,
-      [selectedOrder.Id]: shippingInfo
-    }));
-
-    setShowShippingForm(false);
-    setCarrierName("");
-    setTrackingId("");
-
-    toast.success("Vendor shipping details saved successfully!");
   };
 
   const openReturnDetails = (order) => {
-    if (order.ConfirmationStatus !== "Returned") {
-      toast.error("This order does not have a return request.");
-      return;
-    }
+  if (order.ConfirmationStatus !== "Returned") {
+    toast.error("This order does not have a return request.");
+    return;
+  }
 
-    const returnData = {
-      ...order,
-      ReturnId: order.ReturnId || null,
-      Reason: order.Reason || "No reason provided",
-      RefundAmount: order.RefundAmount || order.TotalAmount,
-      PaymentId: order.PaymentId || "",
-      RefundStatus: order.RefundStatus || "Pending",
-      Status: order.ReturnStatus || "Pending",
-    };
+  // Just use the order as-is — backend already mapped return fields correctly
+  setSelectedOrder(order);
 
-    setSelectedOrder(returnData);
-    setActiveTab("details");
-    setShowShippingForm(false);
-    setCarrierName("");
-    setTrackingId("");
-    setShowReturnModal(true);
-  };
+  setActiveTab("details");
+  setShowShippingForm(false);
+  setCarrierName("");
+  setTrackingId("");
+  setShowReturnModal(true);
+};
 
   const openConfirmedDetails = (order) => {
     setSelectedOrder(order);
@@ -372,7 +427,7 @@ export default function OrderPage() {
                       <div className="bg-red-50 p-8 rounded-xl text-center border border-red-200">
                         <p className="text-lg font-medium text-red-700">Return Status</p>
                         <p className="text-3xl font-bold text-red-900 mt-4">
-                          {selectedOrder.ReturnStatus || "Pending"}
+                          {selectedOrder.Status }
                         </p>
                       </div>
                       <div className="bg-yellow-50 p-8 rounded-xl text-center border border-yellow-200">
@@ -455,95 +510,153 @@ export default function OrderPage() {
                   </>
                 )}
 
-                {activeTab === "vendor-shipping" && (
-                  <div className="max-w-2xl mx-auto">
-                    <h3 className="text-3xl font-bold text-purple-900 mb-8 text-center">
-                      <Truck size={40} className="inline mr-3" />
-                      Product Returned to Vendor
-                    </h3>
+              {activeTab === "vendor-shipping" && (
+  <div className="max-w-2xl mx-auto">
+    <h3 className="text-3xl font-bold text-purple-900 mb-8 text-center">
+      <Truck size={40} className="inline mr-3" />
+      Product Returned to Vendor
+    </h3>
 
-                    {vendorShippingMap[selectedOrder.Id] ? (
-                      <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-10 text-center">
-                        <CheckCircle size={80} className="mx-auto text-green-600 mb-6" />
-                        <h4 className="text-2xl font-bold text-green-900 mb-6">Vendor Shipping Completed</h4>
-                        <div className="space-y-4 text-lg">
-                          <p><strong>Carrier:</strong> {vendorShippingMap[selectedOrder.Id].carrierName}</p>
-                          <p><strong>Tracking ID:</strong>
-                            <span className="font-mono bg-white px-4 py-2 rounded-lg border">
-                              {vendorShippingMap[selectedOrder.Id].trackingId}
-                            </span>
-                          </p>
-                          <p className="text-sm text-gray-600 mt-6">
-                            Submitted on: {vendorShippingMap[selectedOrder.Id].submittedAt}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {!showShippingForm ? (
-                          <div className="text-center py-12">
-                            <div className="bg-purple-50 border-2 border-dashed border-purple-300 rounded-2xl p-12">
-                              <Truck size={80} className="mx-auto text-purple-400 mb-6" />
-                              <p className="text-xl text-gray-700 mb-8">
-                                Initiate shipping of returned item(s) back to the vendor
-                              </p>
-                              <button
-                                onClick={handleInitiateShipping}
-                                className="px-8 py-4 bg-purple-600 text-white text-xl font-bold rounded-xl hover:bg-purple-700 transition shadow-lg"
-                              >
-                                Initiate Shipping
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-10">
-                            <h4 className="text-2xl font-bold text-purple-900 mb-8">Enter Shipping Details</h4>
-                            <div className="space-y-6">
-                              <div>
-                                <label className="block text-lg font-medium text-gray-700 mb-2">Carrier Name</label>
-                                <input
-                                  type="text"
-                                  value={carrierName}
-                                  onChange={(e) => setCarrierName(e.target.value)}
-                                  placeholder="e.g. Delhivery, BlueDart"
-                                  className="w-full px-6 py-4 border-2 border-gray-300 rounded-xl focus:border-purple-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-lg font-medium text-gray-700 mb-2">Tracking ID</label>
-                                <input
-                                  type="text"
-                                  value={trackingId}
-                                  onChange={(e) => setTrackingId(e.target.value)}
-                                  placeholder="e.g. 1234567890"
-                                  className="w-full px-6 py-4 border-2 border-gray-300 rounded-xl focus:border-purple-500"
-                                />
-                              </div>
-                              <div className="flex gap-4 justify-center pt-6">
-                                <button
-                                  onClick={handleSubmitShipping}
-                                  className="px-8 py-4 bg-purple-600 text-white text-xl font-bold rounded-xl hover:bg-purple-700"
-                                >
-                                  Submit Shipping
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setShowShippingForm(false);
-                                    setCarrierName("");
-                                    setTrackingId("");
-                                  }}
-                                  className="px-8 py-4 bg-gray-500 text-white text-xl font-bold rounded-xl hover:bg-gray-600"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
+    {/* Show workflow status */}
+    <div className="mb-8">
+      <h4 className="text-xl font-bold mb-4">Return Workflow:</h4>
+      <div className="flex items-center justify-between mb-2">
+        <div className={`flex items-center ${selectedOrder.Status === "Pending" ? "text-blue-600 font-bold" : "text-gray-400"}`}>
+          <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center mr-2">
+            1
+          </div>
+          <span>Return Requested</span>
+        </div>
+        <div className={`flex items-center ${selectedOrder.Status === "Shipped" ? "text-blue-600 font-bold" : "text-gray-400"}`}>
+          <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center mr-2">
+            2
+          </div>
+          <span>Admin Ships to Vendor</span>
+        </div>
+        <div className={`flex items-center ${selectedOrder.Status === "Confirmed" ? "text-blue-600 font-bold" : "text-gray-400"}`}>
+          <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center mr-2">
+            3
+          </div>
+          <span>Vendor Confirms Receipt</span>
+        </div>
+      </div>
+    </div>
+
+    {/* Check current status */}
+    {selectedOrder.Status === "Shipped" ? (
+      <div className="bg-blue-50 border-2 border-blue-300 rounded-2xl p-8">
+        <div className="text-center mb-6">
+          <Truck size={60} className="mx-auto text-blue-500 mb-4" />
+          <h4 className="text-2xl font-bold text-blue-900 mb-2">Return Shipped to Vendor</h4>
+          <p className="text-gray-600">Waiting for vendor to confirm receipt</p>
+        </div>
+        
+        <div className="space-y-4">
+          <div>
+            <p className="font-medium">Carrier:</p>
+            <p className="text-lg">{selectedOrder.CarrierName}</p>
+          </div>
+          <div>
+            <p className="font-medium">Tracking ID:</p>
+            <p className="text-lg font-mono bg-white px-3 py-1 rounded border">
+              {selectedOrder.TrackingId}
+            </p>
+          </div>
+          <div className="pt-4 border-t">
+            <p className="text-sm text-gray-600">
+              Status: <span className="font-medium text-blue-700">Shipped</span>
+              <br />
+              Next step: Vendor confirms receipt
+            </p>
+          </div>
+        </div>
+      </div>
+    ) : selectedOrder.Status === "Confirmed" ? (
+      <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-10 text-center">
+        <CheckCircle size={80} className="mx-auto text-green-600 mb-6" />
+        <h4 className="text-2xl font-bold text-green-900 mb-6">Return Completed</h4>
+        <div className="space-y-4 text-lg">
+         
+          <p className="text-sm text-gray-600 mt-6">
+            Status: <span className="font-medium text-green-700">Confirmed by Vendor</span>
+          </p>
+        </div>
+      </div>
+    ) : (
+      <>
+        {!showShippingForm ? (
+          <div className="text-center py-12">
+            <div className="bg-purple-50 border-2 border-dashed border-purple-300 rounded-2xl p-12">
+              <Truck size={80} className="mx-auto text-purple-400 mb-6" />
+              <p className="text-xl text-gray-700 mb-8">
+                Initiate shipping of returned item(s) back to the vendor
+              </p>
+              <button
+                onClick={handleInitiateShipping}
+                className="px-8 py-4 bg-purple-600 text-white text-xl font-bold rounded-xl hover:bg-purple-700 transition shadow-lg"
+              >
+                Initiate Shipping to Vendor
+              </button>
+              <p className="text-gray-500 mt-4 text-sm">
+                After shipping, vendor will confirm receipt when they receive the returned items
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-10">
+            <h4 className="text-2xl font-bold text-purple-900 mb-8">Enter Shipping Details</h4>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-lg font-medium text-gray-700 mb-2">Carrier Name</label>
+                <input
+                  type="text"
+                  value={carrierName}
+                  onChange={(e) => setCarrierName(e.target.value)}
+                  placeholder="e.g. Delhivery, BlueDart"
+                  className="w-full px-6 py-4 border-2 border-gray-300 rounded-xl focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-lg font-medium text-gray-700 mb-2">Tracking ID</label>
+                <input
+                  type="text"
+                  value={trackingId}
+                  onChange={(e) => setTrackingId(e.target.value)}
+                  placeholder="e.g. 1234567890"
+                  className="w-full px-6 py-4 border-2 border-gray-300 rounded-xl focus:border-purple-500"
+                />
+              </div>
+              <div className="flex gap-4 justify-center pt-6">
+                <button
+                  onClick={handleSubmitShipping}
+                  disabled={initiatingShipping}
+                  className="px-8 py-4 bg-purple-600 text-white text-xl font-bold rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {initiatingShipping ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Initiating...
+                    </span>
+                  ) : "Submit Shipping"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowShippingForm(false);
+                    setCarrierName("");
+                    setTrackingId("");
+                  }}
+                  className="px-8 py-4 bg-gray-500 text-white text-xl font-bold rounded-xl hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+)}
               </div>
 
               <div className="p-8 border-t-4 border-gray-300 flex justify-end">
@@ -558,7 +671,6 @@ export default function OrderPage() {
           </div>
         )}
 
-      
         {/* Confirmed Modal with Vendor Payment Tab */}
         {showConfirmedModal && selectedOrder && (
           <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
@@ -589,7 +701,6 @@ export default function OrderPage() {
               <div className="p-10 space-y-10">
                 {confirmedActiveTab === "details" && (
                   <>
-                    {/* Details tab unchanged */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div className="bg-blue-50 p-8 rounded-2xl text-center border border-blue-200">
                         <p className="text-lg font-medium">Confirmation Status</p>
@@ -646,26 +757,26 @@ export default function OrderPage() {
                       Vendor Payout
                     </h3>
 
-                  {selectedOrder.VendorPaymentStatus === "Paid" ? (
-  <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-12 text-center">
-    <CheckCircle size={100} className="mx-auto text-green-600 mb-6" />
-    <h4 className="text-3xl font-bold text-green-900 mb-6">Vendor Payment Completed</h4>
-    <div className="space-y-4 text-xl">
-      <p>Paid to Vendor: <strong className="text-green-800">
-        ₹{parseFloat(selectedOrder.VendorPayoutAmount || 0).toFixed(2)}
-      </strong></p>
-      <p>Platform Commission: <strong className="text-orange-800">
-        ₹{parseFloat(selectedOrder.CommissionAmount || 0).toFixed(2)}
-      </strong></p>
-      {selectedOrder.VendorPayoutDate && (
-        <p className="text-gray-600">
-          Paid on: {new Date(selectedOrder.VendorPayoutDate).toLocaleDateString("en-IN")}
-        </p>
-      )}
-    </div>
-    <p className="text-gray-600 mt-8">This order has been fully settled.</p>
-  </div>
-) : (
+                    {selectedOrder.VendorPaymentStatus === "Paid" ? (
+                      <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-12 text-center">
+                        <CheckCircle size={100} className="mx-auto text-green-600 mb-6" />
+                        <h4 className="text-3xl font-bold text-green-900 mb-6">Vendor Payment Completed</h4>
+                        <div className="space-y-4 text-xl">
+                          <p>Paid to Vendor: <strong className="text-green-800">
+                            ₹{parseFloat(selectedOrder.VendorPayoutAmount || 0).toFixed(2)}
+                          </strong></p>
+                          <p>Platform Commission: <strong className="text-orange-800">
+                            ₹{parseFloat(selectedOrder.CommissionAmount || 0).toFixed(2)}
+                          </strong></p>
+                          {selectedOrder.VendorPayoutDate && (
+                            <p className="text-gray-600">
+                              Paid on: {new Date(selectedOrder.VendorPayoutDate).toLocaleDateString("en-IN")}
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-gray-600 mt-8">This order has been fully settled.</p>
+                      </div>
+                    ) : (
                       <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-10">
                         <div className="space-y-8 text-center">
                           <div>
@@ -723,14 +834,9 @@ export default function OrderPage() {
             </div>
           </div>
         )}
-
       </div>
 
       <ToastContainer position="top-right" autoClose={8000} theme="light" />
     </>
   );
 }
-
-
-
-

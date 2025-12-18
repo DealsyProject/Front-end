@@ -10,7 +10,8 @@ export const useDashboardData = (navigate) => {
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  
+  const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   const fetchNotifications = useCallback(async () => {
     try {
       console.log('🔔 [Dashboard] Fetching notifications from API...');
@@ -72,17 +73,66 @@ export const useDashboardData = (navigate) => {
 
   const fetchFinancialData = useCallback(async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      console.log('💰 Fetching financial data...');
       
-      const mockFinancialData = [
-        { title: 'Total Revenue', value: '₹25,430.00', subtitle: '+12% from last month' },
-        { title: 'Total Refunded', value: '₹1,340.00', subtitle: '5 refund requests' }
+      // Fetch earnings data from API
+      const response = await axiosInstance.get('/Payment/vendor/earnings');
+      
+      if (!response.data || !response.data.success) {
+        console.warn('⚠️ No financial data available from API');
+        setFinancialData(getDefaultFinancialData('No data available'));
+        return;
+      }
+      
+      const earnings = response.data.earnings;
+      
+      console.log('📊 Earnings data:', earnings);
+      
+      if (!earnings) {
+        setFinancialData(getDefaultFinancialData('No data available'));
+        return;
+      }
+      
+      const financialCards = [
+        { 
+          title: 'Total Revenue', 
+          value: formatCurrency(earnings.TotalEarnings || 0),
+          subtitle: `From ${earnings.TotalOrders || 0} orders`,
+          trend: earnings.TotalEarnings > 0 ? '+Revenue' : 'No revenue yet',
+          icon: '💰',
+          color: 'green'
+        },
+        { 
+          title: 'My Payouts', 
+          value: formatCurrency(earnings.CompletedPayouts || 0),
+          subtitle: `${earnings.CompletedPayouts > 0 ? 'Received payouts' : 'No payouts yet'}`,
+          trend: earnings.CompletedPayouts > 0 ? '+Paid to you' : 'Pending',
+          icon: '💳',
+          color: 'blue'
+        },
+        { 
+          title: 'Pending Payouts', 
+          value: formatCurrency(earnings.PendingPayouts || 0),
+          subtitle: `From ${earnings.CompletedOrders || 0} delivered orders`,
+          trend: earnings.PendingPayouts > 0 ? 'Pending' : 'All paid',
+          icon: '⏳',
+          color: 'yellow'
+        },
+        { 
+          title: 'Commission Paid', 
+          value: formatCurrency(earnings.CommissionPaid || 0),
+          subtitle: '20% platform commission',
+          trend: '-20% commission',
+          icon: '📊',
+          color: 'purple'
+        }
       ];
       
-      setFinancialData(mockFinancialData);
+      setFinancialData(financialCards);
+      
     } catch (error) {
-      console.error('Error loading financial data:', error);
-      setFinancialData(getDefaultFinancialData());
+      console.error('❌ Error fetching financial data:', error);
+      setFinancialData(getDefaultFinancialData('Data temporarily unavailable'));
     }
   }, []);
 
@@ -176,6 +226,8 @@ export const useDashboardData = (navigate) => {
 
   const fetchDashboardData = useCallback(async () => {
     try {
+      setIsLoading(true);
+      
       const user = localStorage.getItem('currentUser');
       
       if (!user) {
@@ -243,8 +295,10 @@ const formatActivityDate = (dateString) => {
 };
 
 const getDefaultFinancialData = (subtitle = 'No data available') => [
-  { title: 'Total Revenue', value: '₹0.00', subtitle },
-  { title: 'Total Refunded', value: '₹0.00', subtitle }
+  { title: 'Total Revenue', value: '₹0.00', subtitle, icon: '💰', color: 'green' },
+  { title: 'My Payouts', value: '₹0.00', subtitle, icon: '💳', color: 'blue' },
+  { title: 'Pending Payouts', value: '₹0.00', subtitle, icon: '⏳', color: 'yellow' },
+  { title: 'Commission Paid', value: '₹0.00', subtitle, icon: '📊', color: 'purple' }
 ];
 
 const getDefaultActivities = () => [
@@ -254,7 +308,3 @@ const getDefaultActivities = () => [
     date: 'Just now' 
   }
 ];
-
-
-
-

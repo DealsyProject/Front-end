@@ -54,60 +54,62 @@ export default function OrderPage() {
     }
   };
 
-  // Vendor Payment Handler
   const handlePayVendor = async () => {
-    if (!selectedOrder) return;
+  if (!selectedOrder) return;
 
-    const totalAmount = selectedOrder.TotalAmount;
-    const estimatedVendorAmount = totalAmount * 0.8;
-    const estimatedCommission = totalAmount * 0.2;
+  const totalAmount = selectedOrder.TotalAmount;
+  const estimatedVendorAmount = totalAmount * 0.8;
+  const estimatedCommission = totalAmount * 0.2;
 
-    const confirmed = window.confirm(
-      `Pay vendor approximately ₹${estimatedVendorAmount.toFixed(2)} (80% of ₹${totalAmount.toFixed(2)})?\n` +
-      `Platform commission: ₹${estimatedCommission.toFixed(2)} (20%)\n\n` +
-      `Order ID: ${selectedOrder.Id}`
-    );
+  const confirmed = window.confirm(
+    `Pay vendor approximately ₹${estimatedVendorAmount.toFixed(2)} (80% of ₹${totalAmount.toFixed(2)})?\n` +
+    `Platform commission: ₹${estimatedCommission.toFixed(2)} (20%)\n\n` +
+    `Order ID: ${selectedOrder.Id}`
+  );
 
-    if (!confirmed) return;
+  if (!confirmed) return;
 
-    try {
-      setProcessingVendorPayment(true);
+  try {
+    setProcessingVendorPayment(true);
 
-      const paymentData = { OrderId: selectedOrder.Id };
+    const paymentData = { OrderId: selectedOrder.Id };
 
-      const response = await axiosInstance.post("/payment/vendor-payment", paymentData);
+    const response = await axiosInstance.post("/payment/vendor-payment", paymentData);
 
-      if (response.data.success) {
-        const { vendorAmount, commissionAmount } = response.data;
+    if (response.data.success) {
+      const { vendorAmount, commissionAmount } = response.data;
 
-        toast.success(
-          <div className="text-left">
-            <strong>Vendor Payment Successful!</strong><br />
-            Paid to Vendor: <strong>₹{parseFloat(vendorAmount).toFixed(2)}</strong><br />
-            Platform Commission: <strong>₹{parseFloat(commissionAmount).toFixed(2)}</strong><br />
-            <small>Order #{selectedOrder.Id}</small>
-          </div>,
-          { autoClose: 8000 }
-        );
+      toast.success(
+        <div className="text-left">
+          <strong>Vendor Payment Successful!</strong><br />
+          Paid to Vendor: <strong>₹{parseFloat(vendorAmount).toFixed(2)}</strong><br />
+          Platform Commission: <strong>₹{parseFloat(commissionAmount).toFixed(2)}</strong><br />
+          <small>Order #{selectedOrder.Id}</small>
+        </div>,
+        { autoClose: 8000 }
+      );
 
-        setSelectedOrder(prev => ({
-          ...prev,
-          VendorPaymentStatus: "Paid",
-          ReturnVendorAmount: vendorAmount,
-          ReturnCommissionAmount: commissionAmount
-        }));
+      // Update the modal's selectedOrder immediately with correct field names
+      setSelectedOrder(prev => ({
+  ...prev,
+  VendorPaymentStatus: "Paid",
+  VendorPayoutAmount: vendorAmount,
+  CommissionAmount: commissionAmount,
+  VendorPayoutDate: new Date().toISOString()
+}));
 
-        await fetchDeliveredOrders();
-      } else {
-        toast.error(response.data.message || "Vendor payment failed.");
-      }
-    } catch (error) {
-      const message = error.response?.data?.message || "Failed to process vendor payment.";
-      toast.error(message);
-    } finally {
-      setProcessingVendorPayment(false);
+      // Refresh the full list so table also updates
+      await fetchDeliveredOrders();
+    } else {
+      toast.error(response.data.message || "Vendor payment failed.");
     }
-  };
+  } catch (error) {
+    const message = error.response?.data?.message || "Failed to process vendor payment.";
+    toast.error(message);
+  } finally {
+    setProcessingVendorPayment(false);
+  }
+};
 
   // Refund Handler
   const handleProcessRefund = async () => {
@@ -644,17 +646,26 @@ export default function OrderPage() {
                       Vendor Payout
                     </h3>
 
-                    {selectedOrder.VendorPaymentStatus === "Paid" ? (
-                      <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-12 text-center">
-                        <CheckCircle size={100} className="mx-auto text-green-600 mb-6" />
-                        <h4 className="text-3xl font-bold text-green-900 mb-6">Vendor Payment Completed</h4>
-                        <div className="space-y-4 text-xl">
-                          <p>Paid to Vendor: <strong className="text-green-800">₹{parseFloat(selectedOrder.ReturnVendorAmount || 0).toFixed(2)}</strong></p>
-                          <p>Platform Commission: <strong className="text-orange-800">₹{parseFloat(selectedOrder.ReturnCommissionAmount || 0).toFixed(2)}</strong></p>
-                        </div>
-                        <p className="text-gray-600 mt-8">This order has been fully settled.</p>
-                      </div>
-                    ) : (
+                  {selectedOrder.VendorPaymentStatus === "Paid" ? (
+  <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-12 text-center">
+    <CheckCircle size={100} className="mx-auto text-green-600 mb-6" />
+    <h4 className="text-3xl font-bold text-green-900 mb-6">Vendor Payment Completed</h4>
+    <div className="space-y-4 text-xl">
+      <p>Paid to Vendor: <strong className="text-green-800">
+        ₹{parseFloat(selectedOrder.VendorPayoutAmount || 0).toFixed(2)}
+      </strong></p>
+      <p>Platform Commission: <strong className="text-orange-800">
+        ₹{parseFloat(selectedOrder.CommissionAmount || 0).toFixed(2)}
+      </strong></p>
+      {selectedOrder.VendorPayoutDate && (
+        <p className="text-gray-600">
+          Paid on: {new Date(selectedOrder.VendorPayoutDate).toLocaleDateString("en-IN")}
+        </p>
+      )}
+    </div>
+    <p className="text-gray-600 mt-8">This order has been fully settled.</p>
+  </div>
+) : (
                       <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-10">
                         <div className="space-y-8 text-center">
                           <div>

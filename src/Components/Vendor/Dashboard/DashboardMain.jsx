@@ -43,11 +43,12 @@ const DashboardMain = ({
         </div>
       )}
 
-      <div className="gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <FinancialOverview financialData={financialData} />
-          <RecentActivities recentActivities={recentActivities} isLoading={isLoading} />
-        </div>
+      <div className="space-y-6">
+        {/* Financial Overview */}
+        <FinancialOverview financialData={financialData} />
+        
+        {/* Recent Activities */}
+        <RecentActivities recentActivities={recentActivities} isLoading={isLoading} />
       </div>
     </main>
   );

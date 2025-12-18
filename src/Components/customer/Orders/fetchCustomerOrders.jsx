@@ -28,7 +28,11 @@ export default function CustomerOrders() {
 
       // Fetch full return requests for Returns tab
       const returnsRes = await axiosInstance.get('/Order/return/customer');
-      const returnsData = returnsRes.data.returns || [];
+
+      const returnsData = (returnsRes.data.returns || []).filter(ret => {
+        const status = ret.Status?.toLowerCase();
+        return status === "pending" || status === "shipped";
+      });
 
       // Enhance orders with product images
       const updatedOrders = await Promise.all(
@@ -61,20 +65,20 @@ export default function CustomerOrders() {
 
   // Return allowed only if: Delivered + within 1 hour + not already returned
   const canReturnOrder = (order) => {
-  if (!order) return false;
-  
-  // Check both OrderStatus and Status fields
-  const status = (order.OrderStatus || order.Status)?.toLowerCase();
-  if (status !== "delivered") return false;
-  
-  if (order.ConfirmationStatus === "Returned" || order.ConfirmationStatus === "Expired") return false;
-  if (!order.DeliveredDate) return false;
+    if (!order) return false;
 
-  const delivered = new Date(order.DeliveredDate);
-  const now = new Date();
-  const hoursDiff = (now - delivered) / (1000 * 60 * 60);
-  return hoursDiff >= 0 && hoursDiff <= 1;
-};
+    // Check both OrderStatus and Status fields
+    const status = (order.OrderStatus || order.Status)?.toLowerCase();
+    if (status !== "delivered") return false;
+
+    if (order.ConfirmationStatus === "Returned" || order.ConfirmationStatus === "Expired") return false;
+    if (!order.DeliveredDate) return false;
+
+    const delivered = new Date(order.DeliveredDate);
+    const now = new Date();
+    const hoursDiff = (now - delivered) / (1000 * 60 * 60);
+    return hoursDiff >= 0 && hoursDiff <= 1;
+  };
   const handleReturnRequest = async () => {
     if (!returnReason.trim()) {
       alert("Please select a reason for return.");
@@ -146,27 +150,25 @@ export default function CustomerOrders() {
 
   return (
     <div>
-      <h3 className="text-3xl font-bold mb-8">My Orders & Returns</h3>
+      <h3 className="text-3xl font-bold mb-8">Orders & Returns</h3>
 
       {/* Tabs */}
       <div className="flex gap-8 mb-8 border-b border-gray-300">
         <button
           onClick={() => setActiveTab("orders")}
-          className={`pb-4 px-2 font-semibold text-lg border-b-4 transition-colors ${
-            activeTab === "orders"
-              ? "text-[#586330] border-[#586330]"
-              : "text-gray-500 border-transparent hover:text-gray-700"
-          }`}
+          className={`pb-4 px-2 font-semibold text-lg border-b-4 transition-colors ${activeTab === "orders"
+            ? "text-[#586330] border-[#586330]"
+            : "text-gray-500 border-transparent hover:text-gray-700"
+            }`}
         >
           Orders ({orders.length})
         </button>
         <button
           onClick={() => setActiveTab("returns")}
-          className={`pb-4 px-2 font-semibold text-lg border-b-4 transition-colors ${
-            activeTab === "returns"
-              ? "text-[#586330] border-[#586330]"
-              : "text-gray-500 border-transparent hover:text-gray-700"
-          }`}
+          className={`pb-4 px-2 font-semibold text-lg border-b-4 transition-colors ${activeTab === "returns"
+            ? "text-[#586330] border-[#586330]"
+            : "text-gray-500 border-transparent hover:text-gray-700"
+            }`}
         >
           Return Requests ({returns.length})
         </button>
@@ -180,7 +182,7 @@ export default function CustomerOrders() {
             <p className="font-bold text-amber-900 text-lg">Return Policy</p>
             <p className="text-amber-800 mt-2">
               You can request a return <strong>only within 1 hour</strong> after delivery.
-            
+
             </p>
           </div>
         </div>
@@ -232,27 +234,27 @@ export default function CustomerOrders() {
                             </span>
                           </div>
 
-                         {/* In your component */}
-{order.Status?.toLowerCase() === "delivered" || order.OrderStatus?.toLowerCase() === "delivered" ? (
-  <div className="mt-4 text-lg">
-    {canReturnOrder(order) ? (
-      <div className="flex items-center justify-end gap-2 text-green-600 font-bold">
-        <Clock size={20} />
-        Return window open
-      </div>
-    ) : order.ConfirmationStatus === "Returned" ? (
-      <div className="flex items-center justify-end gap-2 text-red-600 font-bold">
-        <AlertCircle size={20} />
-        Return Requested
-      </div>
-    ) : (
-      <div className="flex items-center justify-end gap-2 text-gray-600">
-        <AlertCircle size={20} />
-        Return window expired or not eligible
-      </div>
-    )}
-  </div>
-) : null}
+                          {/* In your component */}
+                          {order.Status?.toLowerCase() === "delivered" || order.OrderStatus?.toLowerCase() === "delivered" ? (
+                            <div className="mt-4 text-lg">
+                              {canReturnOrder(order) ? (
+                                <div className="flex items-center justify-end gap-2 text-green-600 font-bold">
+                                  <Clock size={20} />
+                                  Return window open
+                                </div>
+                              ) : order.ConfirmationStatus === "Returned" ? (
+                                <div className="flex items-center justify-end gap-2 text-red-600 font-bold">
+                                  <AlertCircle size={20} />
+                                  Return Requested
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end gap-2 text-gray-600">
+                                  <AlertCircle size={20} />
+                                  Return window expired or not eligible
+                                </div>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </div>

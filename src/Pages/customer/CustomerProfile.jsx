@@ -3,6 +3,9 @@ import Navbar from "../../Components/customer/Common/Navbar";
 import Footer from "../../Components/customer/Common/Footer";
 import axiosInstance from "../../Components/utils/axiosInstance";
 import CustomerOrders from "../../Components/customer/Orders/fetchCustomerOrders";
+import ConfirmedReturns from "../../Components/customer/Orders/fetchConfirmedReturns";
+import ConfirmedOrders from "../../Components/customer/Orders/fetchConfirmedOrders";
+
 import { Pencil, Trash2, User } from "lucide-react";
 
 export default function ProfilePage() {
@@ -15,7 +18,7 @@ export default function ProfilePage() {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
 
-  const menu = ["My Profile", "My Orders", "Returned", "Refunded","Rate & Review"];
+  const menu = ["My Profile", "Orders History", "Accepted orders", "Returned", "Rate & Review"];
 
   useEffect(() => {
     fetchProfileData();
@@ -244,22 +247,16 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {active === "My Orders" && (
+            {active === "Orders History" && (
               <CustomerOrders />
             )}
 
             {active === "Returned" && (
-              <div className="text-center py-12">
-                <p className="text-gray-500 mb-4">No returned orders yet</p>
-                <p className="text-sm text-gray-400">Your returned orders will appear here</p>
-              </div>
+              <ConfirmedReturns />
             )}
 
-            {active === "Refunded" && (
-              <div className="text-center py-12">
-                <p className="text-gray-500 mb-4">No refunded orders yet</p>
-                <p className="text-sm text-gray-400">Your refunded orders will appear here</p>
-              </div>
+             {active === "Accepted orders" && (
+              <ConfirmedOrders />
             )}
           </div>
         </div>

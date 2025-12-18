@@ -16,6 +16,12 @@ const Invoices = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
 
+  // Shipping Modal State
+  const [showShippingModal, setShowShippingModal] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState(null);
+  const [carrierName, setCarrierName] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -49,22 +55,36 @@ const Invoices = () => {
     }
   };
 
-  const handleShipOrder = async (orderId) => {
-    const carrierName = prompt('Enter Carrier Name (e.g., Delhivery, BlueDart):');
-    if (!carrierName) return;
+  // Open Shipping Modal
+  const openShippingModal = (orderId) => {
+    setCurrentOrderId(orderId);
+    setCarrierName('');
+    setTrackingNumber('');
+    setShowShippingModal(true);
+  };
 
-    const trackingNumber = prompt('Enter Tracking Number:');
-    if (!trackingNumber) return;
+  // Submit Shipping Details
+  const handleShipOrder = async () => {
+    if (!carrierName.trim()) {
+      toast.error('Carrier name is required');
+      return;
+    }
+    if (!trackingNumber.trim()) {
+      toast.error('Tracking number is required');
+      return;
+    }
 
     try {
       setLoading(true);
-      const response = await axiosInstance.post(`/Order/${orderId}/ship`, {
-        carrierName,
-        trackingNumber,
+      const response = await axiosInstance.post(`/Order/${currentOrderId}/ship`, {
+        carrierName: carrierName.trim(),
+        trackingNumber: trackingNumber.trim(),
       });
 
-      toast.success(`Order shipped! Invoice ${response.data.invoiceNumber} generated.`);
-      fetchData();
+      toast.success(`Order shipped successfully! Invoice ${response.data.invoiceNumber} generated.`);
+      setShowShippingModal(false);
+      setShowOrderModal(false); // Close order modal if open
+      fetchData(); // Refresh both orders and invoices
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to ship order');
     } finally {
@@ -99,17 +119,13 @@ const Invoices = () => {
 
   const handlePrintInvoice = (invoice) => {
     setSelectedInvoice(invoice);
-
     setTimeout(() => {
       setShowInvoiceModal(true);
-
       setTimeout(() => {
         const printContent = document.getElementById('invoice-print-content');
         if (printContent) {
           const originalContent = document.body.innerHTML;
-          const printContentHTML = printContent.innerHTML;
-
-          document.body.innerHTML = printContentHTML;
+          document.body.innerHTML = printContent.innerHTML;
           window.print();
           document.body.innerHTML = originalContent;
           window.location.reload();
@@ -118,13 +134,11 @@ const Invoices = () => {
     }, 100);
   };
 
-  // Open the user's default email client (Outlook, Gmail, Apple Mail, etc.)
   const handleSendEmail = (invoice) => {
     const customerEmail = invoice.Order?.CustomerEmail || '';
     const customerName = invoice.Order?.CustomerName || 'Customer';
     const invoiceNumber = invoice.InvoiceNumber || `INV-${invoice.InvoiceId}`;
     const amount = formatCurrency(invoice.Amount);
-    const orderId = invoice.Order?.OrderId;
 
     if (!customerEmail) {
       toast.error('Customer email not available');
@@ -133,26 +147,21 @@ const Invoices = () => {
 
     const subject = encodeURIComponent(`Invoice ${invoiceNumber} from DEALSY`);
     const body = encodeURIComponent(
-  `Dear ${customerName},\n\n` +
-  `Thank you so much for your purchase with DEALSY! 🎉 We're thrilled to have you as a customer and truly appreciate your support.\n\n` +
-  `Your order has been successfully Delivered, and here's a quick summary of your invoice:\n\n` +
-  `📄 Invoice Number: ${invoiceNumber}\n` +
-  `📅 Invoice Date: ${formatDateFull(invoice.InvoiceDate)}\n` +
- 
-  `💰 Total Amount: ${amount}\n\n` +
-  
-  `If you have any questions about your order, need assistance,  feel free to reply to this email—we're here to help!\n\n` +
-  `We hope you loved the product Recieved, and we can't wait to serve you again soon. 😊\n\n` +
-  `Best regards,\n` +
-  `The DEALSY Team\n` +
-  `support@dealsy.com | www.dealsy.com`
-);
+      `Dear ${customerName},\n\n` +
+      `Thank you so much for your purchase with DEALSY! 🎉 We're thrilled to have you as a customer and truly appreciate your support.\n\n` +
+      `Your order has been successfully Delivered, and here's a quick summary of your invoice:\n\n` +
+      `📄 Invoice Number: ${invoiceNumber}\n` +
+      `📅 Invoice Date: ${formatDateFull(invoice.InvoiceDate)}\n` +
+      `💰 Total Amount: ${amount}\n\n` +
+      `If you have any questions about your order or need assistance, feel free to reply to this email—we're here to help!\n\n` +
+      `We hope you loved the product received, and we can't wait to serve you again soon. 😊\n\n` +
+      `Best regards,\n` +
+      `The DEALSY Team\n` +
+      `support@dealsy.com | www.dealsy.com`
+    );
 
-    const mailtoLink = `mailto:${customerEmail}?subject=${subject}&body=${body}`;
-
-    window.location.href = mailtoLink;
-
-    toast.success('Opening your email app to send the invoice...');
+    window.location.href = `mailto:${customerEmail}?subject=${subject}&body=${body}`;
+    toast.success('Opening your email client...');
   };
 
   const formatCurrency = (amt) =>
@@ -193,43 +202,90 @@ const Invoices = () => {
     return 'bg-gray-100 text-gray-800';
   };
 
-  const canShip = (order) =>
-    ['Pending', 'Confirmed'].includes(order.Status || order.status);
-
-  const canDeliver = (order) =>
-    ['Shipped'].includes(order.Status || order.status);
+  const canShip = (order) => ['Pending', 'Confirmed'].includes(order.Status || order.status);
+  const canDeliver = (order) => ['Shipped'].includes(order.Status || order.status);
 
   return (
     <>
       <ToastContainer position="top-right" />
 
+      {/* Shipping Modal */}
+      {showShippingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Enter Shipping Details</h2>
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Carrier Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={carrierName}
+                  onChange={(e) => setCarrierName(e.target.value)}
+                  placeholder="e.g., Delhivery, BlueDart, DTDC"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#586330] focus:border-transparent"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tracking Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={trackingNumber}
+                  onChange={(e) => setTrackingNumber(e.target.value)}
+                  placeholder="Enter tracking ID"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#586330] focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-4 mt-8">
+              <button
+                onClick={handleShipOrder}
+                disabled={loading}
+                className="flex-1 py-3 bg-[#586330] text-white font-medium rounded-lg hover:bg-[#4a5428] disabled:opacity-70 transition"
+              >
+                {loading ? 'Shipping...' : 'Ship Order'}
+              </button>
+              <button
+                onClick={() => setShowShippingModal(false)}
+                className="px-6 py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Order Details Modal */}
       {showOrderModal && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="p-6 border-b flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-800">
-                Order {selectedOrder.OrderId}
-              </h2>
+              <h2 className="text-2xl font-bold text-gray-800">Order {selectedOrder.OrderId}</h2>
               <button
                 onClick={() => setShowOrderModal(false)}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
-               Close
+                Close
               </button>
             </div>
 
             <div className="p-8">
               <div className="mb-8">
-                <div className="grid grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div>
                     <h3 className="font-bold text-gray-700 mb-2">Customer Details:</h3>
                     <p className="font-medium">{selectedOrder.CustomerName || 'Customer'}</p>
                     <p className="text-gray-600">{selectedOrder.CustomerEmail}</p>
-                   
                   </div>
                   <div className="text-right">
-                    <h3 className="font-bold text-gray-700 mb-2">Order Details:</h3>
                    
                     <p className="text-gray-600">
                       <span className="font-medium">Order Status:</span>{' '}
@@ -238,7 +294,7 @@ const Invoices = () => {
                       </span>
                     </p>
                     <p className="text-gray-600">
-                      <span className="font-medium">Confirmation Staus:</span>{' '}
+                      <span className="font-medium">Confirmation:</span>{' '}
                       <span className={`ml-2 px-3 py-1 rounded-full text-xs ${getStatusColor(selectedOrder.ConfirmationStatus)}`}>
                         {selectedOrder.ConfirmationStatus || 'Pending'}
                       </span>
@@ -255,7 +311,6 @@ const Invoices = () => {
                       <th className="text-left p-3 border">Product</th>
                       <th className="text-left p-3 border">Quantity</th>
                       <th className="text-left p-3 border">Unit Price</th>
-                      
                     </tr>
                   </thead>
                   <tbody>
@@ -264,16 +319,14 @@ const Invoices = () => {
                         <td className="p-3 border">{item.ProductName}</td>
                         <td className="p-3 border">{item.Quantity}</td>
                         <td className="p-3 border">{formatCurrency(item.Price)}</td>
-                        
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end mb-8">
                 <div className="w-64">
-                  
                   <div className="flex justify-between py-2 text-lg font-bold">
                     <span>Total Amount:</span>
                     <span className="text-[#586330]">{formatCurrency(selectedOrder.TotalAmount)}</span>
@@ -292,27 +345,20 @@ const Invoices = () => {
                 <div className="flex gap-4">
                   {canShip(selectedOrder) && (
                     <button
-                      onClick={() => {
-                        setShowOrderModal(false);
-                        handleShipOrder(selectedOrder.OrderId);
-                      }}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      onClick={() => openShippingModal(selectedOrder.OrderId)}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                     >
                       Ship Order
                     </button>
                   )}
                   {canDeliver(selectedOrder) && (
                     <button
-                      onClick={() => {
-                        setShowOrderModal(false);
-                        handleMarkDelivered(selectedOrder.OrderId);
-                      }}
-                      className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      onClick={() => handleMarkDelivered(selectedOrder.OrderId)}
+                      className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
                     >
                       Mark as Delivered
                     </button>
                   )}
-                  
                 </div>
               </div>
             </div>
@@ -320,27 +366,25 @@ const Invoices = () => {
         </div>
       )}
 
-      {/* Invoice Preview Modal */}
+      {/* Invoice Modal */}
       {showInvoiceModal && selectedInvoice && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="p-6 border-b flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-800">
-               INVOICE
-              </h2>
-              <div className="flex gap-2">
+              <h2 className="text-2xl font-bold text-gray-800">INVOICE</h2>
+              <div className="flex gap-3">
                 <button
                   onClick={() => handlePrintInvoice(selectedInvoice)}
-                  className="px-4 py-2 bg-[#586330] text-white rounded-lg  flex items-center gap-2"
+                  className="px-5 py-2 bg-[#586330] text-white rounded-lg flex items-center gap-2 hover:bg-[#4a5428]"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                   </svg>
                   Print
                 </button>
                 <button
                   onClick={() => setShowInvoiceModal(false)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                  className="px-5 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
                 >
                   Close
                 </button>
@@ -348,17 +392,17 @@ const Invoices = () => {
             </div>
 
             <div id="invoice-print-content" className="p-8">
+              {/* Invoice content remains exactly as you had it */}
               <div className="mb-8 pb-6 border-b">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-800">{selectedInvoice.InvoiceNumber}</h1>
-                     <p className="text-gray-600">
-                    <span className="font-medium">Invoice Date:</span> {formatDateFull(selectedInvoice.InvoiceDate)}
-                  </p>
+                    <h1 className="text-3xl font-bold text-gray-800">{selectedInvoice.InvoiceNumber}</h1>
+                    <p className="text-gray-600 mt-2">
+                      <span className="font-medium">Invoice Date:</span> {formatDateFull(selectedInvoice.InvoiceDate)}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <h2 className="text-2xl font-bold text-[#586330]">DEALSY</h2>
-                    
+                    <h2 className="text-3xl font-bold text-[#586330]">DEALSY</h2>
                   </div>
                 </div>
               </div>
@@ -371,8 +415,7 @@ const Invoices = () => {
                   <p className="text-gray-600">{selectedInvoice.Order?.ShippingAddress || 'Address not provided'}</p>
                 </div>
                 <div className="text-right">
-                  <h3 className="font-bold text-gray-700 mb-2"> Details:</h3>
-                 
+                  <h3 className="font-bold text-gray-700 mb-2">Details:</h3>
                   <p className="text-gray-600">
                     <span className="font-medium">Order ID:</span> {selectedInvoice.Order?.OrderId}
                   </p>
@@ -394,7 +437,6 @@ const Invoices = () => {
                       <th className="text-left p-3 border">Product</th>
                       <th className="text-left p-3 border">Quantity</th>
                       <th className="text-left p-3 border">Unit Price</th>
-                     
                     </tr>
                   </thead>
                   <tbody>
@@ -403,7 +445,6 @@ const Invoices = () => {
                         <td className="p-3 border">{item.ProductName}</td>
                         <td className="p-3 border">{item.Quantity}</td>
                         <td className="p-3 border">{formatCurrency(item.Price)}</td>
-                        
                       </tr>
                     ))}
                   </tbody>
@@ -412,9 +453,7 @@ const Invoices = () => {
 
               <div className="flex justify-end">
                 <div className="w-64">
-                  
-                  
-                  <div className="flex justify-between py-2 text-lg font-bold">
+                  <div className="flex justify-between py-3 text-xl font-bold border-t-4 border-[#586330] pt-4">
                     <span>Total Amount:</span>
                     <span className="text-[#586330]">{formatCurrency(selectedInvoice.Amount)}</span>
                   </div>
@@ -430,6 +469,7 @@ const Invoices = () => {
         </div>
       )}
 
+      {/* Main Layout */}
       <div className="flex min-h-screen bg-gray-50">
         <Sidebar
           handleLogout={() => {
@@ -441,28 +481,25 @@ const Invoices = () => {
         />
 
         <div className="flex-1 p-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Order & Invoice Management
-          </h1>
-         
+          <h1 className="text-3xl font-bold text-gray-800 mb-8">Order & Invoice Management</h1>
 
-          <div className="flex border-b border-gray-200 mb-8">
+          <div className="flex border-b border-gray-300 mb-8">
             <button
               onClick={() => setActiveTab('orders')}
-              className={`px-6 py-3 font-medium ${
+              className={`px-8 py-4 font-semibold text-lg ${
                 activeTab === 'orders'
-                  ? 'text-[#586330] border-b-2 border-[#586330]'
-                  : 'text-gray-500'
+                  ? 'text-[#586330] border-b-4 border-[#586330]'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Orders ({orders.length})
             </button>
             <button
               onClick={() => setActiveTab('invoices')}
-              className={`px-6 py-3 font-medium ${
+              className={`px-8 py-4 font-semibold text-lg ${
                 activeTab === 'invoices'
-                  ? 'text-[#586330] border-b-2 border-[#586330]'
-                  : 'text-gray-500'
+                  ? 'text-[#586330] border-b-4 border-[#586330]'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Invoices ({invoices.length})
@@ -470,16 +507,15 @@ const Invoices = () => {
           </div>
 
           {loading && (
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#586330]"></div>
-              <span className="ml-3 text-gray-600">Loading...</span>
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[#586330]"></div>
+              <span className="ml-4 text-lg text-gray-600">Loading...</span>
             </div>
           )}
 
-          {/* Orders Tab */}
+          {/* Orders Table */}
           {!loading && activeTab === 'orders' && (
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-              
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-[#586330] text-white">
@@ -495,52 +531,31 @@ const Invoices = () => {
                   </thead>
                   <tbody>
                     {orders.map((order) => (
-                      <tr
-                        key={order.OrderId || order.id}
-                        className="border-b hover:bg-[#F5F1E8]"
-                      >
-                        <td className="px-6 py-4 font-medium">
-                          Order {order.OrderId || order.id}
-                        </td>
+                      <tr key={order.OrderId} className="border-b hover:bg-[#F5F1E8] transition">
+                        <td className="px-6 py-4 font-medium">Order {order.OrderId}</td>
                         <td className="px-6 py-4">
-                          <div className="font-medium">
-                            {order.CustomerName || 'Unknown'}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {order.CustomerEmail}
-                          </div>
+                          <div className="font-medium">{order.CustomerName || 'Unknown'}</div>
+                          <div className="text-sm text-gray-500">{order.CustomerEmail}</div>
                         </td>
-                        <td className="px-6 py-4 font-bold text-[#586330]">
-                          {formatCurrency(order.TotalAmount)}
-                        </td>
+                        <td className="px-6 py-4 font-bold text-[#586330]">{formatCurrency(order.TotalAmount)}</td>
                         <td className="px-6 py-4">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs ${getStatusColor(
-                              order.Status
-                            )}`}
-                          >
+                          <span className={`px-3 py-1 rounded-full text-xs ${getStatusColor(order.Status)}`}>
                             {order.Status || 'Pending'}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs ${getStatusColor(
-                              order.ConfirmationStatus
-                            )}`}
-                          >
+                          <span className={`px-3 py-1 rounded-full text-xs ${getStatusColor(order.ConfirmationStatus)}`}>
                             {order.ConfirmationStatus || 'Pending'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm">
-                          {formatDate(order.CreatedOn || order.OrderDate)}
-                        </td>
+                        <td className="px-6 py-4 text-sm">{formatDate(order.CreatedOn || order.OrderDate)}</td>
                         <td className="px-6 py-4">
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
                             <button
                               onClick={() => handleViewOrder(order)}
-                              className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-xs flex items-center gap-1"
+                              className="px-4 py-2 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 flex items-center gap-1"
                             >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
@@ -549,8 +564,8 @@ const Invoices = () => {
 
                             {canShip(order) && (
                               <button
-                                onClick={() => handleShipOrder(order.OrderId || order.id)}
-                                className="px-3 py-1 bg-[#586330] text-white rounded  text-xs"
+                                onClick={() => openShippingModal(order.OrderId)}
+                                className="px-4 py-2 bg-[#586330] text-white rounded text-xs hover:bg-[#4a5428]"
                               >
                                 Ship
                               </button>
@@ -558,8 +573,8 @@ const Invoices = () => {
 
                             {canDeliver(order) && (
                               <button
-                                onClick={() => handleMarkDelivered(order.OrderId || order.id)}
-                                className="px-3 py-1 bg-[#586330]/70 text-white rounded  text-xs"
+                                onClick={() => handleMarkDelivered(order.OrderId)}
+                                className="px-4 py-2 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                               >
                                 Deliver
                               </button>
@@ -570,7 +585,7 @@ const Invoices = () => {
                     ))}
                     {orders.length === 0 && (
                       <tr>
-                        <td colSpan="7" className="text-center py-10 text-gray-500">
+                        <td colSpan="7" className="text-center py-16 text-gray-500 text-lg">
                           No orders found.
                         </td>
                       </tr>
@@ -581,10 +596,9 @@ const Invoices = () => {
             </div>
           )}
 
-          {/* Invoices Tab */}
+          {/* Invoices Table */}
           {!loading && activeTab === 'invoices' && (
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-              
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-[#586330] text-white">
@@ -601,47 +615,28 @@ const Invoices = () => {
                   </thead>
                   <tbody>
                     {invoices.map((inv) => (
-                      <tr
-                        key={inv.InvoiceId}
-                        className="border-b hover:bg-[#F5F1E8]"
-                      >
-                        <td className="px-6 py-4 font-medium">
-                          {inv.InvoiceNumber || `INV-${inv.InvoiceId}`}
-                        </td>
+                      <tr key={inv.InvoiceId} className="border-b hover:bg-[#F5F1E8] transition">
+                        <td className="px-6 py-4 font-medium">{inv.InvoiceNumber || `INV-${inv.InvoiceId}`}</td>
                         <td className="px-6 py-4">Order {inv.Order?.OrderId}</td>
                         <td className="px-6 py-4">
-                          <div className="font-medium">
-                            {inv.Order?.CustomerName || 'Unknown'}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {inv.Order?.CustomerEmail}
-                          </div>
+                          <div className="font-medium">{inv.Order?.CustomerName || 'Unknown'}</div>
+                          <div className="text-sm text-gray-500">{inv.Order?.CustomerEmail}</div>
                         </td>
-                        <td className="px-6 py-4 font-bold text-[#586330]">
-                          {formatCurrency(inv.Amount)}
-                        </td>
-                        <td className="px-6 py-4 text-sm">
-                          {formatDate(inv.InvoiceDate)}
-                        </td>
+                        <td className="px-6 py-4 font-bold text-[#586330]">{formatCurrency(inv.Amount)}</td>
+                        <td className="px-6 py-4 text-sm">{formatDate(inv.InvoiceDate)}</td>
                         <td className="px-6 py-4">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs ${getStatusColor(
-                              inv.OrderStatus
-                            )}`}
-                          >
+                          <span className={`px-3 py-1 rounded-full text-xs ${getStatusColor(inv.OrderStatus)}`}>
                             {inv.OrderStatus}
                           </span>
                         </td>
-                        <td className="px-6 py-4 font-mono text-sm">
-                          {inv.TrackingNumber || 'N/A'}
-                        </td>
+                        <td className="px-6 py-4 font-mono text-sm">{inv.TrackingNumber || 'N/A'}</td>
                         <td className="px-6 py-4">
                           <div className="flex flex-wrap gap-2">
                             <button
                               onClick={() => handleViewInvoice(inv)}
-                              className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-xs flex items-center gap-1"
+                              className="px-3 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 flex items-center gap-1"
                             >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
@@ -649,18 +644,18 @@ const Invoices = () => {
                             </button>
                             <button
                               onClick={() => handlePrintInvoice(inv)}
-                              className="px-3 py-1 bg-[#586330] text-white rounded text-xs flex items-center gap-1"
+                              className="px-3 py-1 bg-[#586330] text-white rounded text-xs hover:bg-[#4a5428] flex items-center gap-1"
                             >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                               </svg>
                               Print
                             </button>
                             <button
                               onClick={() => handleSendEmail(inv)}
-                              className="px-3 py-1 bg-[#586330]/70 text-white rounded  text-xs flex items-center gap-1"
+                              className="px-3 py-1 bg-[#586330]/80 text-white rounded text-xs hover:bg-[#586330] flex items-center gap-1"
                             >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                               </svg>
                               Email
@@ -668,7 +663,7 @@ const Invoices = () => {
                             {inv.OrderStatus === 'Shipped' && (
                               <button
                                 onClick={() => handleMarkDelivered(inv.Order?.OrderId)}
-                                className="px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 text-xs"
+                                className="px-3 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
                               >
                                 Deliver
                               </button>
@@ -679,7 +674,7 @@ const Invoices = () => {
                     ))}
                     {invoices.length === 0 && (
                       <tr>
-                        <td colSpan="8" className="text-center py-10 text-gray-500">
+                        <td colSpan="8" className="text-center py-16 text-gray-500 text-lg">
                           No invoices generated yet. Ship an order to create one.
                         </td>
                       </tr>

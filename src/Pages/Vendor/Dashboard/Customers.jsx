@@ -327,7 +327,29 @@ const Customers = () => {
           <p className="text-gray-600 mt-1">View orders, returns, and customer details</p>
         </div>
 
-        {/* Tabs */}
+       
+       
+
+        {/* Search & Refresh */}
+        <div className="mb-8 bg-white p-5 rounded-xl shadow-sm">
+          <div className="flex gap-4 items-center">
+            <input
+              type="text"
+              placeholder={
+                activeTab === 'orders' 
+                  ? "Search by customer name, email, or order ID..." 
+                  : "Search by customer name, order ID, or tracking ID..."
+              }
+              value={activeTab === 'orders' ? searchTerm : searchReturnTerm}
+              onChange={(e) => activeTab === 'orders' ? setSearchTerm(e.target.value) : setSearchReturnTerm(e.target.value)}
+              className="flex-1 px-5 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#586330]"
+            />
+           
+          </div>
+        </div>
+
+
+          {/* Tabs */}
         <div className="mb-8 bg-white p-2 rounded-xl shadow-sm inline-flex">
           <button
             onClick={() => setActiveTab('orders')}
@@ -353,52 +375,6 @@ const Customers = () => {
           </button>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-5 rounded-xl shadow-sm border">
-            <div className="text-2xl font-bold text-blue-600">{flattenedOrders.length}</div>
-            <div className="text-sm text-gray-600 mt-1">Total Orders</div>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border">
-            <div className="text-2xl font-bold text-green-600">{uniqueCustomers.length}</div>
-            <div className="text-sm text-gray-600 mt-1">Unique Customers</div>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border">
-            <div className="text-2xl font-bold text-purple-600">
-              {formatCurrency(flattenedOrders.reduce((sum, o) => sum + o.totalAmount, 0))}
-            </div>
-            <div className="text-sm text-gray-600 mt-1">Total Revenue</div>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border">
-            <div className="text-2xl font-bold text-orange-600">{vendorReturns.length}</div>
-            <div className="text-sm text-gray-600 mt-1">Return Requests</div>
-          </div>
-        </div>
-
-        {/* Search & Refresh */}
-        <div className="mb-8 bg-white p-5 rounded-xl shadow-sm">
-          <div className="flex gap-4 items-center">
-            <input
-              type="text"
-              placeholder={
-                activeTab === 'orders' 
-                  ? "Search by customer name, email, or order ID..." 
-                  : "Search by customer name, order ID, or tracking ID..."
-              }
-              value={activeTab === 'orders' ? searchTerm : searchReturnTerm}
-              onChange={(e) => activeTab === 'orders' ? setSearchTerm(e.target.value) : setSearchReturnTerm(e.target.value)}
-              className="flex-1 px-5 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#586330]"
-            />
-            <button
-              onClick={handleRefresh}
-              className="px-6 py-3 bg-[#586330] text-white rounded-lg hover:bg-[#4a5428] transition font-medium flex items-center gap-2"
-            >
-              <RefreshCw size={20} />
-              Refresh
-            </button>
-          </div>
-        </div>
-
         {loading && activeTab === 'orders' ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[#586330]"></div>
@@ -417,13 +393,14 @@ const Customers = () => {
                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                   <div className="bg-[#586330] text-white p-5">
                     <div className="flex justify-between items-center">
-                      <h2 className="text-xl font-semibold">Orders ({filteredOrders.length})</h2>
+                      <h2 className="text-xl font-semibold">Orders Available </h2> 
                       <span className="text-sm bg-white/20 px-3 py-1 rounded-full">
                         {uniqueCustomers.length} customers
                       </span>
                     </div>
                   </div>
-
+                   
+                   
                   <div className="max-h-[70vh] overflow-y-auto">
                     {filteredOrders.length === 0 ? (
                       <div className="p-12 text-center">
@@ -489,12 +466,12 @@ const Customers = () => {
                 </div>
               ) : (
                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                  <div className="bg-purple-600 text-white p-5">
+                  <div className="bg-[#586330] text-white p-5">
                     <div className="flex justify-between items-center">
-                      <h2 className="text-xl font-semibold">Return Requests ({filteredReturns.length})</h2>
-                      <span className="text-sm bg-white/20 px-3 py-1 rounded-full">
-                        Page {returnsPage} of {returnsTotalPages}
-                      </span>
+                      <h2 className="text-xl font-semibold">Return Requests </h2> 
+                       
+
+                      
                     </div>
                   </div>
 
@@ -517,9 +494,9 @@ const Customers = () => {
                           <div
                             key={returnItem.returnId}
                             onClick={() => handleReturnSelect(returnItem)}
-                            className={`p-5 border-b border-gray-100 cursor-pointer transition-all hover:bg-purple-50 ${
+                            className={`p-5 border-b border-gray-100 cursor-pointer transition-all hover:bg-[#586330]/20 ${
                               selectedReturn?.returnId === returnItem.returnId
-                                ? 'bg-purple-50 border-l-4 border-l-purple-600'
+                                ? 'bg-[#586330]/10 border-l-4 '
                                 : ''
                             }`}
                           >
@@ -532,43 +509,18 @@ const Customers = () => {
                                   Order {returnItem.orderNumber}
                                 </p>
                               </div>
-                              <span className="text-sm font-medium text-purple-600 bg-purple-100 px-2 py-1 rounded">
-                                Return #{returnItem.returnId}
-                              </span>
+                             
                             </div>
 
-                            <div className="mt-2 mb-3">
-                              <p className="text-sm text-gray-700 line-clamp-2">
-                                <span className="font-medium">Reason:</span> {returnItem.reason || 'No reason provided'}
-                              </p>
-                            </div>
+                            
 
                             <div className="flex justify-between items-center">
-                              <div className="flex items-center gap-2">
-                                {returnItem.trackingId ? (
-                                  <>
-                                    <Truck size={16} className="text-green-600" />
-                                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
-                                      {returnItem.trackingId}
-                                    </span>
-                                  </>
-                                ) : returnItem.status === 'Shipped' ? (
-                                  <span className="text-xs text-blue-600 font-medium">In Transit</span>
-                                ) : returnItem.status === 'Pending' ? (
-                                  <span className="text-xs text-yellow-600 font-medium">Awaiting Shipping</span>
-                                ) : null}
-                              </div>
+                              
                               <div className="flex flex-col items-end">
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${getReturnStatusColor(returnItem.status)} mb-1`}>
                                   {returnItem.status}
                                 </span>
-                                {returnItem.refundStatus && (
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    returnItem.refundStatus === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                    Refund: {returnItem.refundStatus}
-                                  </span>
-                                )}
+                               
                               </div>
                             </div>
 
@@ -623,7 +575,7 @@ const Customers = () => {
                       <div className="flex items-center gap-4 text-gray-600">
                         <span>{selectedOrder.customerEmail}</span>
                         <span className="text-gray-400">•</span>
-                        <span>Customer ID: {selectedOrder.customerId}</span>
+                        
                       </div>
                     </div>
 
@@ -631,9 +583,9 @@ const Customers = () => {
                     <div className="bg-gray-50 p-6 rounded-xl mb-8">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="text-xl font-semibold text-gray-800 mb-2">Order #{selectedOrder.orderId}</h3>
+                          <h3 className="text-xl font-semibold text-gray-800 mb-2">Order {selectedOrder.orderId}</h3>
                           <p className="text-gray-600">
-                            Placed on {formatDate(selectedOrder.orderDate)}
+                            Booked on {formatDate(selectedOrder.orderDate)}
                           </p>
                           {selectedOrder.deliveredDate && (
                             <p className="text-gray-600">
@@ -642,9 +594,7 @@ const Customers = () => {
                           )}
                         </div>
                         <div className="text-right">
-                          <p className="text-3xl font-bold text-[#586330] mb-3">
-                            {formatCurrency(selectedOrder.totalAmount)}
-                          </p>
+                          
                           <div className="flex gap-2 justify-end flex-wrap">
                             <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(selectedOrder.orderStatus)}`}>
                               {selectedOrder.orderStatus}
@@ -687,35 +637,7 @@ const Customers = () => {
                       </div>
                     </div>
 
-                    {/* Customer Stats */}
-                    {customerStats && (
-                      <div className="mb-8">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Customer Statistics</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="bg-blue-50 p-4 rounded-xl text-center border border-blue-100">
-                            <div className="text-2xl font-bold text-blue-600">{customerStats.totalOrders}</div>
-                            <div className="text-sm text-blue-800 mt-1">Total Orders</div>
-                          </div>
-                          <div className="bg-green-50 p-4 rounded-xl text-center border border-green-100">
-                            <div className="text-2xl font-bold text-green-600">{customerStats.completedOrders}</div>
-                            <div className="text-sm text-green-800 mt-1">Completed</div>
-                          </div>
-                          <div className="bg-yellow-50 p-4 rounded-xl text-center border border-yellow-100">
-                            <div className="text-2xl font-bold text-yellow-600">{customerStats.pendingOrders}</div>
-                            <div className="text-sm text-yellow-800 mt-1">Pending/Shipped</div>
-                          </div>
-                          <div className="bg-red-50 p-4 rounded-xl text-center border border-red-100">
-                            <div className="text-2xl font-bold text-red-600">{customerStats.returnedOrders}</div>
-                            <div className="text-sm text-red-800 mt-1">Returned</div>
-                          </div>
-                        </div>
-                        <div className="mt-4 text-center">
-                          <p className="text-gray-600">
-                            Total spent: <span className="font-bold text-[#586330]">{formatCurrency(customerStats.totalSpent)}</span>
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                   
 
                     {/* Order Items */}
                     <div>
@@ -727,7 +649,7 @@ const Customers = () => {
                               <div>
                                 <p className="font-medium text-gray-800 text-lg">{item.ProductName || 'Unknown Product'}</p>
                                 <div className="mt-2 flex gap-6 text-sm text-gray-600">
-                                  <span>Product ID: {item.ProductId}</span>
+                                
                                   <span>Quantity: {item.Quantity || 1}</span>
                                   <span>Price: {formatCurrency(item.Price)} each</span>
                                 </div>
@@ -736,7 +658,7 @@ const Customers = () => {
                                 <p className="text-lg font-semibold text-[#586330]">
                                   {formatCurrency((item.Price || 0) * (item.Quantity || 1))}
                                 </p>
-                                <p className="text-sm text-gray-500 mt-1">Subtotal</p>
+                                
                               </div>
                             </div>
                           ))}
@@ -774,37 +696,29 @@ const Customers = () => {
                   <div className="bg-white rounded-xl shadow-lg p-8">
                     {/* Return Details Header */}
                     <div className="mb-8">
-                      <h2 className="text-2xl font-bold text-gray-800 mb-2">Return Request #{selectedReturn.returnId}</h2>
+                      <h2 className="text-2xl font-bold text-gray-800 mb-2">Return Request {selectedReturn.returnId}</h2>
                       <div className="flex items-center gap-4 text-gray-600">
                         <span>{selectedReturn.customerName}</span>
                         <span className="text-gray-400">•</span>
-                        <span>Order: {selectedReturn.orderNumber}</span>
+                        <span>{selectedReturn.orderNumber}</span>
                       </div>
                     </div>
 
                     {/* Return Summary */}
-                    <div className="bg-purple-50 p-6 rounded-xl mb-8 border border-purple-200">
+                    <div className="bg-[#586330]/20 p-6 rounded-xl mb-8 border border-purple-200">
                       <div className="flex justify-between items-start">
                         <div>
                           <h3 className="text-xl font-semibold text-gray-800 mb-2">Return Details</h3>
                           <p className="text-gray-600">
                             Return requested on {formatDate(selectedReturn.returnDate)}
                           </p>
-                          {selectedReturn.shippingSubmittedAt && (
-                            <p className="text-gray-600 mt-1">
-                              Shipping initiated: {formatDate(selectedReturn.shippingSubmittedAt)}
-                            </p>
-                          )}
+                         
                         </div>
                         <div className="text-right">
                           <div className={`px-4 py-2 rounded-full text-sm font-medium ${getReturnStatusColor(selectedReturn.status)} mb-2`}>
                             {selectedReturn.status}
                           </div>
-                          {selectedReturn.refundStatus && (
-                            <div className={`px-3 py-1 rounded-full text-xs font-medium ${selectedReturn.refundStatus === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                              Refund: {selectedReturn.refundStatus}
-                            </div>
-                          )}
+                         
                         </div>
                       </div>
                       
@@ -816,34 +730,17 @@ const Customers = () => {
                             <p className="font-medium">{selectedReturn.carrierName}</p>
                           </div>
                         )}
-                        {selectedReturn.trackingId && (
-                          <div>
-                            <p className="text-sm text-gray-500">Tracking ID</p>
-                            <p className="font-mono font-medium bg-white px-3 py-1 rounded border">
-                              {selectedReturn.trackingId}
-                            </p>
-                          </div>
-                        )}
-                        {selectedReturn.refundAmount > 0 && (
-                          <div>
-                            <p className="text-sm text-gray-500">Refund Amount</p>
-                            <p className="font-medium text-red-600">{formatCurrency(selectedReturn.refundAmount)}</p>
-                          </div>
-                        )}
-                        {selectedReturn.refundDate && (
-                          <div>
-                            <p className="text-sm text-gray-500">Refund Date</p>
-                            <p className="font-medium">{formatDate(selectedReturn.refundDate)}</p>
-                          </div>
-                        )}
+                        
+                        
+                        
                       </div>
                     </div>
 
                     {/* Vendor Action - Confirm Receipt */}
                     {selectedReturn.status === 'Shipped' && (
                       <div className="mb-8">
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-                          <h4 className="text-lg font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                        <div className="bg-[#586330]/20 border border-[#586330]/20 rounded-xl p-6">
+                          <h4 className="text-lg font-semibold text-[#586330] mb-3 flex items-center gap-2">
                             <CheckCircle size={20} />
                             Action Required
                           </h4>
@@ -856,10 +753,10 @@ const Customers = () => {
                                 handleConfirmReturnReceipt(selectedReturn.returnId);
                               }
                             }}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2"
+                            className="px-6 py-3 bg-[#586330] text-white rounded-lg  transition font-medium flex items-center gap-2"
                           >
                             <CheckCircle size={20} />
-                            Confirm Receipt of Returned Items
+                            Confirm Receipt 
                           </button>
                         </div>
                       </div>
@@ -871,20 +768,20 @@ const Customers = () => {
                         <FileText size={20} />
                         Return Reason
                       </h3>
-                      <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                      <div className="bg-[#586330]/10 border border-[#586330] p-4 rounded-lg">
                         <p className="text-gray-700 italic">"{selectedReturn.reason || 'No reason provided'}"</p>
                       </div>
                     </div>
 
                     {/* Return Items */}
                     <div className="mb-8">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Returned Items ({selectedReturn.items?.length || 0})</h3>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Items:({selectedReturn.items?.length || 0})</h3>
                       {selectedReturn.items && selectedReturn.items.length > 0 ? (
                         <div className="space-y-4">
                           {selectedReturn.items.map((item, idx) => {
                             // Handle both object structures
                             const productName = item.productName || item.ProductName || 'Unknown Product';
-                            const productId = item.productId || item.ProductId || 'N/A';
+                           
                             const quantity = item.quantity || item.Quantity || 1;
                             const price = item.price || item.Price || 0;
                             
@@ -893,13 +790,13 @@ const Customers = () => {
                                 <div>
                                   <p className="font-medium text-gray-800 text-lg">{productName}</p>
                                   <div className="mt-2 flex gap-6 text-sm text-gray-600">
-                                    <span>Product ID: {productId}</span>
+                                   
                                     <span>Quantity: {quantity}</span>
                                     <span>Price: {formatCurrency(price)} each</span>
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-lg font-semibold text-purple-600">
+                                  <p className="text-lg font-semibold ">
                                     {formatCurrency(price * quantity)}
                                   </p>
                                   <p className="text-sm text-gray-500 mt-1">Item Total</p>

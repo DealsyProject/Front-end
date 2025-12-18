@@ -319,24 +319,9 @@ const Payments = () => {
         <div className="flex justify-between items-start mb-8">
           <div>
             <h3 className="text-2xl font-bold text-gray-800 mb-5">Order Payment Information</h3>
-            <div className="flex items-center gap-4 mt-4 flex-wrap">
-              <PaymentStatusBadge status={selectedPayment.status} />
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                selectedPayment.orderStatus === 'Delivered' ? 'bg-green-100 text-green-800' : 
-                selectedPayment.orderStatus === 'Shipped' ? 'bg-blue-100 text-blue-800' :
-                selectedPayment.orderStatus === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {selectedPayment.orderStatus}
-              </span>
-              {selectedPayment.isPaidToVendor && (
-                <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                  Paid to Vendor
-                </span>
-              )}
-            </div>
+            
             <div className="mt-3 text-sm text-gray-600">
-              Order: {selectedPayment.orderNumber} | 
+              {selectedPayment.orderNumber} | 
               Date: {formatDateOnly(selectedPayment.orderDate)}
             </div>
           </div>
@@ -359,10 +344,7 @@ const Payments = () => {
           <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
             <h4 className="text-lg font-bold text-gray-800 mb-4">Payment Details</h4>
             <div className="space-y-4 text-base">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Order ID</span>
-                <span className="font-mono font-semibold">{selectedPayment.orderNumber}</span>
-              </div>
+              
               <div className="flex justify-between">
                 <span className="text-gray-600">Transaction ID</span>
                 <span className="font-mono font-semibold">{selectedPayment.transactionId}</span>
@@ -387,7 +369,7 @@ const Payments = () => {
           </div>
 
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-            <h4 className="text-lg font-bold text-gray-800 mb-4">Payout Information</h4>
+            <h4 className="text-lg font-bold text-gray-800 mb-4">Order Confirmation</h4>
             <div className="space-y-4">
               {selectedPayment.isPaidToVendor ? (
                 <>
@@ -466,19 +448,9 @@ const Payments = () => {
               selectedPayment.items.map((item, i) => (
                 <div key={i} className="flex items-center justify-between bg-gray-50 p-6 rounded-xl hover:shadow-md transition-shadow">
                   <div className="flex items-center space-x-6">
-                    <div className="w-24 h-24 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500 text-xs">
-                      {item.productImage ? (
-                        <img 
-                          src={item.productImage} 
-                          alt={item.productName} 
-                          className="w-full h-full object-cover rounded-lg" 
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.parentNode.innerText = 'No Image';
-                          }}
-                        />
-                      ) : 'No Image'}
-                    </div>
+                    
+                      
+                   
                     <div>
                       <h4 className="text-xl font-semibold text-gray-800">{item.productName}</h4>
                       <p className="text-gray-600 mt-1">Product ID: {item.productId}</p>
@@ -627,15 +599,7 @@ const Payments = () => {
                   <h1 className="text-3xl font-bold text-gray-800">Payments</h1>
                   <p className="text-gray-600 mt-2">Manage and track all payment transactions</p>
                 </div>
-                <button 
-                  onClick={refreshAllData}
-                  className="px-4 py-2 bg-[#586330] text-white rounded-lg hover:bg-[#586330]/80 flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
+               
               </div>
             </header>
 
@@ -686,18 +650,7 @@ const Payments = () => {
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330] focus:border-transparent"
                           />
                         </div>
-                        <div className="w-full lg:w-auto">
-                          <select 
-                            value={statusFilter} 
-                            onChange={(e) => setStatusFilter(e.target.value)} 
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330] focus:border-transparent"
-                          >
-                            <option value="all">All Status</option>
-                            <option value="paid">Paid</option>
-                            <option value="pending">Pending</option>
-                            <option value="failed">Failed</option>
-                          </select>
-                        </div>
+                        
                       </div>
                     </div>
 
@@ -709,7 +662,7 @@ const Payments = () => {
                               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Order Details</th>
                               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                              <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                              <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Payment Status</th>
                               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Vendor Payment</th>
                               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                             </tr>
@@ -721,7 +674,7 @@ const Payments = () => {
                                 <tr key={payment.paymentId} className="hover:bg-gray-50">
                                   <td className="px-6 py-4">
                                     <div className="text-sm font-medium text-gray-900">{payment.orderNumber}</div>
-                                    <div className="text-xs text-gray-500 mt-1">ID: {payment.orderId}</div>
+                                    
                                     <div className="text-xs text-gray-500">{formatDateOnly(payment.orderDate)}</div>
                                   </td>
                                   <td className="px-6 py-4">
@@ -730,15 +683,7 @@ const Payments = () => {
                                   </td>
                                   <td className="px-6 py-4">
                                     <div className="text-lg font-bold text-gray-900">{formatCurrency(payment.amount)}</div>
-                                    {payment.isPaidToVendor ? (
-                                      <div className="text-xs text-green-600">
-                                        Paid: {formatCurrency(payment.vendorPayoutAmount)}
-                                      </div>
-                                    ) : payment.orderStatus === 'Delivered' ? (
-                                      <div className="text-xs text-yellow-600">
-                                        Pending: {formatCurrency(vendorShare)}
-                                      </div>
-                                    ) : null}
+                                   
                                   </td>
                                   <td className="px-6 py-4">
                                     <PaymentStatusBadge status={payment.status} />
@@ -753,7 +698,7 @@ const Payments = () => {
                                         </div>
                                       </div>
                                     ) : payment.orderStatus === 'Delivered' ? (
-                                      <div className="text-yellow-600 font-medium">Pending</div>
+                                      <div className="text-[#586330] font-medium">Pending</div>
                                     ) : (
                                       <div className="text-gray-500 font-medium">Not Delivered</div>
                                     )}
@@ -778,14 +723,9 @@ const Payments = () => {
                             <h3 className="text-xl font-semibold text-gray-600 mb-2">No order payments found</h3>
                             <p className="text-gray-500 mb-4">You will see order payments when customers place orders for your products</p>
                             <div className="space-x-4">
+                             
                               <button 
-                                onClick={fetchOrderPayments}
-                                className="px-4 py-2 bg-[#586330] text-white rounded-lg hover:bg-[#586330]/80"
-                              >
-                                Refresh
-                              </button>
-                              <button 
-                                onClick={() => navigate('/vendor/dashboard')}
+                                onClick={() => navigate('/vendor-dashboard')}
                                 className="px-4 py-2 border border-[#586330] text-[#586330] rounded-lg hover:bg-[#586330]/10"
                               >
                                 Go to Dashboard
@@ -812,24 +752,13 @@ const Payments = () => {
                         <div className="flex-1">
                           <input
                             type="text"
-                            placeholder="Search by Payout ID, transaction..."
+                            placeholder="Search by Payout ID"
                             value={vendorSearchTerm}
                             onChange={(e) => setVendorSearchTerm(e.target.value)}
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330] focus:border-transparent"
                           />
                         </div>
-                        <div className="w-full lg:w-auto">
-                          <select 
-                            value={vendorStatusFilter} 
-                            onChange={(e) => setVendorStatusFilter(e.target.value)} 
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330] focus:border-transparent"
-                          >
-                            <option value="all">All Status</option>
-                            <option value="paid">Paid</option>
-                            <option value="pending">Pending</option>
-                            <option value="processing">Processing</option>
-                          </select>
-                        </div>
+                        
                       </div>
                     </div>
 
@@ -849,7 +778,7 @@ const Payments = () => {
                             {filteredVendorPayments.map(payment => (
                               <tr key={payment.payoutId} className="hover:bg-gray-50">
                                 <td className="px-6 py-4">
-                                  <div className="text-sm font-medium text-gray-900">Payout #{payment.payoutId}</div>
+                                  <div className="text-sm font-medium text-gray-900">PAY-{payment.payoutId}</div>
                                   <div className="text-xs text-gray-500 mt-1">{formatDateOnly(payment.date)}</div>
                                   <div className="text-xs text-gray-500">TXN: {payment.transactionId}</div>
                                 </td>
@@ -857,10 +786,8 @@ const Payments = () => {
                                   <div className="text-sm">
                                     {payment.orderInfo ? (
                                       <>
-                                        <div className="font-medium">Order #{payment.orderInfo.Id}</div>
-                                        <div className="text-xs text-gray-500">
-                                          {formatCurrency(payment.orderInfo.TotalAmount)}
-                                        </div>
+                                        <div className="font-medium">Order {payment.orderInfo.Id}</div>
+                                        
                                         <div className="text-xs text-gray-500">
                                           {payment.orderInfo.Customer?.CustomerName || 'Customer'}
                                         </div>
@@ -901,12 +828,7 @@ const Payments = () => {
                             <h3 className="text-xl font-semibold text-gray-600 mb-2">No payouts found</h3>
                             <p className="text-gray-500 mb-4">Admin will process payouts for confirmed orders</p>
                             <div className="space-x-4">
-                              <button 
-                                onClick={fetchVendorPayments}
-                                className="px-4 py-2 bg-[#586330] text-white rounded-lg hover:bg-[#586330]/80"
-                              >
-                                Refresh
-                              </button>
+                             
                               <button 
                                 onClick={() => setActiveTab('orders')}
                                 className="px-4 py-2 border border-[#586330] text-[#586330] rounded-lg hover:bg-[#586330]/10"

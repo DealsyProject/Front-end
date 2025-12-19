@@ -183,7 +183,7 @@ const ProductDetailModal = ({ product, isOpen, onClose }) => {
                     <Tag className="w-5 h-5 text-green-600" />
                     <span className="text-sm font-medium text-green-800">Price</span>
                   </div>
-                  <p className="text-2xl font-bold text-green-900 mt-1">${product.Price}</p>
+                  <p className="text-2xl font-bold text-green-900 mt-1">₹{product.Price}</p>
                   <span className="text-xs text-green-700">Current price</span>
                 </div>
               </div>
@@ -191,27 +191,10 @@ const ProductDetailModal = ({ product, isOpen, onClose }) => {
 
             {/* Right Column - Detailed Information */}
             <div className="space-y-6">
-              {/* Product Name and Rating */}
+              {/* Product Name  */}
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.ProductName}</h1>
-                {product.Rating > 0 && (
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i < Math.floor(product.Rating) 
-                              ? 'text-yellow-400 fill-current' 
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-lg font-semibold text-gray-700">{product.Rating}</span>
-                    <span className="text-gray-500">rating</span>
-                  </div>
-                )}
+               
               </div>
 
               {/* Description */}
@@ -271,49 +254,7 @@ const ProductDetailModal = ({ product, isOpen, onClose }) => {
                 )}
               </div>
 
-              {/* Image Information */}
-              {product.Images && product.Images.length > 0 && (
-                <div className="bg-purple-50 rounded-lg border border-purple-200 p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Package className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-purple-900">Image Details</h4>
-                      <p className="text-sm text-purple-600">
-                        {product.Images.length} image(s) available
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    {product.Images.map((image, index) => (
-                      <div 
-                        key={index} 
-                        className={`flex items-center justify-between p-2 rounded ${
-                          selectedImageIndex === index ? 'bg-purple-100' : 'bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-700">Image {index + 1}</span>
-                          {image.IsPrimary && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">Primary</span>
-                          )}
-                          {image.ImageOrder && (
-                            <span className="text-xs text-gray-500">Order: {image.ImageOrder}</span>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => setSelectedImageIndex(index)}
-                          className="text-sm text-purple-600 hover:text-purple-800"
-                        >
-                          View
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+             
             </div>
           </div>
         </div>
@@ -933,7 +874,7 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
       'Price': product.Price,
       'Quantity': product.Quantity,
       'Status': getStatusText(product),
-      'Rating': product.Rating || 'N/A',
+      
       'Vendor': product.VendorName || 'Unknown Vendor',
       'Created Date': new Date(product.CreatedOn).toLocaleDateString(),
       'Last Updated': product.ModifiedOn ? new Date(product.ModifiedOn).toLocaleDateString() : 'N/A'
@@ -1041,10 +982,7 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
           aValue = new Date(a.CreatedOn);
           bValue = new Date(b.CreatedOn);
           break;
-        case 'rating':
-          aValue = a.Rating || 0;
-          bValue = b.Rating || 0;
-          break;
+        
         default:
           aValue = a.ProductName?.toLowerCase();
           bValue = b.ProductName?.toLowerCase();
@@ -1108,7 +1046,7 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Price:</span>
-                  <span className="font-medium text-[#586330]">${product.Price}</span>
+                  <span className="font-medium text-[#586330]">₹{product.Price}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Stock:</span>
@@ -1119,12 +1057,7 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
                     </span>
                   </div>
                 </div>
-                {product.Rating > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Rating:</span>
-                    <span className="font-medium">{product.Rating} ★</span>
-                  </div>
-                )}
+               
                 <div className="flex justify-between">
                   <span className="text-gray-600">Images:</span>
                   <span className="font-medium">{product.Images?.length || 0}</span>
@@ -1275,7 +1208,7 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
             <option value="name">Sort by Name</option>
             <option value="price">Sort by Price</option>
             <option value="quantity">Sort by Quantity</option>
-            <option value="rating">Sort by Rating</option>
+          
             <option value="date">Sort by Date</option>
           </select>
 
@@ -1437,7 +1370,7 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
                   <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
                   <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Price</th>
                   <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock</th>
-                  <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Rating</th>
+                 
                   <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                   <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
                   <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
@@ -1482,15 +1415,13 @@ const handleDeleteCategory = async (categoryName, categoryId = null) => {
                           {product.ProductCategory?.toLowerCase()}
                         </td>
                         <td className="px-6 py-4 text-center text-gray-900 font-medium">
-                          ${product.Price}
+                          ₹{product.Price}
                         </td>
                         <td className="px-6 py-4 text-center flex items-center justify-center gap-1 text-gray-800">
                           {getStockIcon(product)}
                           <span>{product.Quantity}</span>
                         </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {product.Rating ? `${product.Rating} ★` : 'N/A'}
-                        </td>
+                       
                         <td className="px-6 py-4 text-center">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(product)}`}>
                             {getStatusText(product)}

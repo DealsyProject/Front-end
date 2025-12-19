@@ -5,6 +5,8 @@ import axiosInstance from "../../Components/utils/axiosInstance";
 import CustomerOrders from "../../Components/customer/Orders/fetchCustomerOrders";
 import ConfirmedReturns from "../../Components/customer/Orders/fetchConfirmedReturns";
 import ConfirmedOrders from "../../Components/customer/Orders/fetchConfirmedOrders";
+import ConfirmedProductReviews from "../../Components/customer/Orders/ConfirmedProductReviews";
+
 
 import { Pencil, Trash2, User } from "lucide-react";
 
@@ -257,6 +259,9 @@ export default function ProfilePage() {
 
              {active === "Accepted orders" && (
               <ConfirmedOrders />
+            )}
+             {active === "Rate & Review" && (
+              <ConfirmedProductReviews />
             )}
           </div>
         </div>

@@ -5,6 +5,7 @@ import ProductModal from '../../../Components/Vendor/Dashboard/modals/ProductMod
 import Sidebar from '../../../Components/Vendor/Dashboard/Sidebar';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../../../Components/utils/axiosInstance';
+import ReviewsTab from './ReviewsTab'; // We'll create this component
 
 const Products = () => {
   const navigate = useNavigate();
@@ -19,7 +20,10 @@ const Products = () => {
 
   const activeView = 'products';
 
-  // Pagination & filter states
+  // Tab state
+  const [activeTab, setActiveTab] = useState('products'); // 'products' or 'reviews'
+
+  // Pagination & filter states for products
   const [currentPage, setCurrentPage] = useState(1);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -229,8 +233,10 @@ const Products = () => {
   }, [currentPage, activeCategory, searchQuery, handleApiError]);
 
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    if (activeTab === 'products') {
+      fetchProducts();
+    }
+  }, [fetchProducts, activeTab]);
 
   // Reset page when filters change
   const handleCategoryFilter = (category) => {
@@ -610,212 +616,241 @@ const Products = () => {
       <div className="flex-1 p-6 text-black">
         <header className="mb-6 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">My Products</h1>
-            <p className="text-gray-600 mt-2">Manage your product inventory</p>
+            <h1 className="text-3xl font-bold text-gray-800">My Products & Reviews</h1>
+            <p className="text-gray-600 mt-2">
+              {activeTab === 'products' ? 'Manage your product inventory' : 'View customer reviews and ratings'}
+            </p>
           </div>
-          <button
-            onClick={handleAddProduct}
-            disabled={!vendorProfile || availableCategories.length === 0}
-            className={`${
-              !vendorProfile || availableCategories.length === 0
-                ? 'opacity-50 cursor-not-allowed'
-                : ''
-            } bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition flex items-center space-x-2 font-medium`}
-            title={
-              !vendorProfile
-                ? 'Create profile first'
-                : availableCategories.length === 0
-                ? 'No categories available'
-                : 'Add new product'
-            }
-          >
-            <span className="text-lg">+</span>
-            <span>Add Product</span>
-          </button>
+          {activeTab === 'products' && (
+            <button
+              onClick={handleAddProduct}
+              disabled={!vendorProfile || availableCategories.length === 0}
+              className={`${
+                !vendorProfile || availableCategories.length === 0
+                  ? 'opacity-50 cursor-not-allowed'
+                  : ''
+              } bg-[#586330] text-white px-6 py-3 rounded-lg hover:bg-[#586330]/80 transition flex items-center space-x-2 font-medium`}
+              title={
+                !vendorProfile
+                  ? 'Create profile first'
+                  : availableCategories.length === 0
+                  ? 'No categories available'
+                  : 'Add new product'
+              }
+            >
+              <span className="text-lg">+</span>
+              <span>Add Product</span>
+            </button>
+          )}
         </header>
 
-        {/* Search Bar */}
-        <div className="mb-6">
-          <form onSubmit={handleSearchSubmit} className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="Search by product name (first word only)..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-                onKeyDown={handleSearchSubmit}
-                className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330] focus:border-transparent"
-              />
-              <svg className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-           
-          </form>
-          {searchQuery && (
-            <p className="text-sm text-gray-600 mt-2">
-              Showing results for: <strong>"{searchQuery}"</strong>
-            </p>
-          )}
+        {/* Tab Navigation */}
+        <div className="mb-8">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('products')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'products'
+                  ? 'border-b-2 border-[#586330] text-[#586330]'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <span>📦</span>
+                <span>Products</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('reviews')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'reviews'
+                  ? 'border-b-2 border-[#586330] text-[#586330]'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <span>⭐</span>
+                <span>Customer Reviews</span>
+              </div>
+            </button>
+          </div>
         </div>
 
-        {/* Category Filters */}
-        {categoriesLoading || profileLoading ? (
-          <div className="mb-8 text-center py-4">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-4 border-[#586330]"></div>
-            <p className="mt-2 text-gray-600">Loading categories...</p>
-          </div>
-        ) : availableCategories.length > 0 ? (
-          <div className="mb-8">
-            {/* <p className="text-sm text-gray-600 mb-2">
-              {isAllBusinessType
-                ? 'Available categories (General)'
-                : `Available category (${vendorProfile?.BusinessType} Business):`}
-            </p> */}
-            <div className="flex gap-4 flex-wrap">
-              {availableCategories.map((cat) => (
+        {/* Products Tab Content */}
+        {activeTab === 'products' && (
+          <>
+            {/* Search Bar */}
+            <div className="mb-6">
+              <form onSubmit={handleSearchSubmit} className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Search by product name (first word only)..."
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    onKeyDown={handleSearchSubmit}
+                    className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#586330] focus:border-transparent"
+                  />
+                  <svg className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={handleClearSearch}
+                      className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </form>
+              {searchQuery && (
+                <p className="text-sm text-gray-600 mt-2">
+                  Showing results for: <strong>"{searchQuery}"</strong>
+                </p>
+              )}
+            </div>
+
+            {/* Category Filters */}
+            {categoriesLoading || profileLoading ? (
+              <div className="mb-8 text-center py-4">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-4 border-[#586330]"></div>
+                <p className="mt-2 text-gray-600">Loading categories...</p>
+              </div>
+            ) : availableCategories.length > 0 ? (
+              <div className="mb-8">
+                <div className="flex gap-4 flex-wrap">
+                  {availableCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => handleCategoryFilter(cat)}
+                      disabled={!!searchQuery} // Disable category filter when searching
+                      className={`px-4 py-2 rounded-lg font-medium transition ${
+                        searchQuery
+                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          : activeCategory === cat
+                          ? 'bg-[#586330] text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-yellow-800">
+                  No categories available for your business type.
+                </p>
+              </div>
+            )}
+
+            {/* Loading, Summary, Grid, Empty State, Pagination */}
+            {loading && (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-[#586330]"></div>
+                <p className="mt-4 text-lg text-gray-600">Loading products...</p>
+              </div>
+            )}
+
+            {!loading && products.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            )}
+
+            {!loading && products.length === 0 && (
+              <div className="text-center py-16 bg-white rounded-xl shadow-md">
+                <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center text-5xl">
+                  📦
+                </div>
+                <h3 className="text-xl font-semibold text-gray-600">
+                  {searchQuery ? 'No matching products found' : 'No products yet'}
+                </h3>
+                <p className="text-gray-500 mt-2">
+                  {searchQuery
+                    ? `No product starts with "${searchQuery}"`
+                    : 'Start by adding your first product'}
+                </p>
+              </div>
+            )}
+
+            {!loading && totalPages > 1 && (
+              <div className="flex justify-center items-center mt-10 space-x-2">
                 <button
-                  key={cat}
-                  onClick={() => handleCategoryFilter(cat)}
-                  disabled={!!searchQuery} // Disable category filter when searching
-                  className={`px-4 py-2 rounded-lg font-medium transition ${
-                    searchQuery
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      : activeCategory === cat
-                      ? 'bg-[#586330] text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
-                  }`}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={!hasPreviousPage}
+                  className={`px-4 py-2 rounded-lg ${hasPreviousPage ? 'bg-[#586330] text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
                 >
-                  {cat}
+                  Previous
                 </button>
-              ))}
-            </div>
-           
-          </div>
-        ) : (
-          <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-yellow-800">
-              No categories available for your business type.
-            </p>
-          </div>
+
+                {getPageNumbers().map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    className={`px-4 py-2 rounded-lg ${currentPage === p ? 'bg-[#586330] text-white' : 'bg-white border border-gray-300'}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={!hasNextPage}
+                  className={`px-4 py-2 rounded-lg ${hasNextPage ? 'bg-[#586330] text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+
+            {/* Modals */}
+            {showAddModal && (
+              <ProductModal
+                title="Add New Product"
+                newProduct={newProduct}
+                setNewProduct={setNewProduct}
+                onSave={handleSaveNewProduct}
+                onClose={() => {
+                  setShowAddModal(false);
+                  setNewProduct({ productName: '', description: '', price: 0, quantity: 1, productCategory: '', images: [], rating: 0 });
+                }}
+                handleImageUpload={handleImageUpload}
+                handleRemoveImage={handleRemoveImage}
+                categories={availableCategories}
+                isSaving={saving}
+              />
+            )}
+
+            {showUpdateModal && (
+              <ProductModal
+                title="Update Product"
+                newProduct={newProduct}
+                setNewProduct={setNewProduct}
+                onSave={handleSaveUpdatedProduct}
+                onClose={() => {
+                  setShowUpdateModal(false);
+                  setEditingProduct(null);
+                  setNewProduct({ productName: '', description: '', price: 0, quantity: 1, productCategory: '', images: [], rating: 0 });
+                }}
+                handleImageUpload={handleImageUpload}
+                handleRemoveImage={handleRemoveImage}
+                categories={availableCategories}
+                isSaving={saving}
+                editingProduct={editingProduct}
+              />
+            )}
+          </>
         )}
 
-        {/* Loading, Summary, Grid, Empty State, Pagination */}
-        {loading && (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-[#586330]"></div>
-            <p className="mt-4 text-lg text-gray-600">Loading products...</p>
-          </div>
-        )}
-
-        {/* {!loading && (
-          <div className="mb-6 flex justify-between items-center">
-            <span className="text-sm text-gray-600">
-              Showing {totalCount} product{totalCount !== 1 ? 's' : ''}
-              {searchQuery && ` matching "${searchQuery}"`}
-              {activeCategory !== 'all' && activeCategory !== 'All' && !searchQuery && ` in "${activeCategory}"`}
-            </span>
-          </div>
-        )} */}
-
-        {!loading && products.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        )}
-
-        {!loading && products.length === 0 && (
-          <div className="text-center py-16 bg-white rounded-xl shadow-md">
-            <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center text-5xl">
-              📦
-            </div>
-            <h3 className="text-xl font-semibold text-gray-600">
-              {searchQuery ? 'No matching products found' : 'No products yet'}
-            </h3>
-            <p className="text-gray-500 mt-2">
-              {searchQuery
-                ? `No product starts with "${searchQuery}"`
-                : 'Start by adding your first product'}
-            </p>
-          </div>
-        )}
-
-        {!loading && totalPages > 1 && (
-          <div className="flex justify-center items-center mt-10 space-x-2">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={!hasPreviousPage}
-              className={`px-4 py-2 rounded-lg ${hasPreviousPage ? 'bg-[#586330] text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-            >
-              Previous
-            </button>
-
-            {getPageNumbers().map((p) => (
-              <button
-                key={p}
-                onClick={() => handlePageChange(p)}
-                className={`px-4 py-2 rounded-lg ${currentPage === p ? 'bg-[#586330] text-white' : 'bg-white border border-gray-300'}`}
-              >
-                {p}
-              </button>
-            ))}
-
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={!hasNextPage}
-              className={`px-4 py-2 rounded-lg ${hasNextPage ? 'bg-[#586330] text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-            >
-              Next
-            </button>
-          </div>
-        )}
-
-        {/* Modals */}
-        {showAddModal && (
-          <ProductModal
-            title="Add New Product"
-            newProduct={newProduct}
-            setNewProduct={setNewProduct}
-            onSave={handleSaveNewProduct}
-            onClose={() => {
-              setShowAddModal(false);
-              setNewProduct({ productName: '', description: '', price: 0, quantity: 1, productCategory: '', images: [], rating: 0 });
-            }}
-            handleImageUpload={handleImageUpload}
-            handleRemoveImage={handleRemoveImage}
-            categories={availableCategories}
-            isSaving={saving}
-          />
-        )}
-
-        {showUpdateModal && (
-          <ProductModal
-            title="Update Product"
-            newProduct={newProduct}
-            setNewProduct={setNewProduct}
-            onSave={handleSaveUpdatedProduct}
-            onClose={() => {
-              setShowUpdateModal(false);
-              setEditingProduct(null);
-              setNewProduct({ productName: '', description: '', price: 0, quantity: 1, productCategory: '', images: [], rating: 0 });
-            }}
-            handleImageUpload={handleImageUpload}
-            handleRemoveImage={handleRemoveImage}
-            categories={availableCategories}
-            isSaving={saving}
-            editingProduct={editingProduct}
-          />
+        {/* Reviews Tab Content */}
+        {activeTab === 'reviews' && (
+          <ReviewsTab vendorProfile={vendorProfile} handleApiError={handleApiError} />
         )}
 
         <ToastContainer position="top-right" autoClose={3000} />
@@ -825,3 +860,4 @@ const Products = () => {
 };
 
 export default Products;
+

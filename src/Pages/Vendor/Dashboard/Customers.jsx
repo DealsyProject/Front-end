@@ -431,7 +431,7 @@ const Customers = () => {
                               <p className="text-sm text-gray-600 truncate">{order.customerEmail}</p>
                             </div>
                             <span className="text-sm font-medium text-[#586330] bg-[#f8f6f0] px-2 py-1 rounded">
-                              Order #{order.orderId}
+                              Order {order.orderId}
                             </span>
                           </div>
 
@@ -506,7 +506,7 @@ const Customers = () => {
                                   {returnItem.customerName}
                                 </h3>
                                 <p className="text-sm text-gray-600 truncate">
-                                  Order {returnItem.orderNumber}
+                                 Order {returnItem.orderId}
                                 </p>
                               </div>
                              
@@ -700,7 +700,7 @@ const Customers = () => {
                       <div className="flex items-center gap-4 text-gray-600">
                         <span>{selectedReturn.customerName}</span>
                         <span className="text-gray-400">•</span>
-                        <span>{selectedReturn.orderNumber}</span>
+                        <span>  Order {selectedReturn.orderId}</span>
                       </div>
                     </div>
 

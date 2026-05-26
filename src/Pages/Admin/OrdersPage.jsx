@@ -277,9 +277,9 @@ export default function OrderPage() {
   const getStatusBadge = (status) => {
     if (!status) return "bg-gray-100 text-gray-800";
     const s = status.toLowerCase();
-    if (s === "delivered") return "bg-green-100 text-green-800";
-    if (s === "returned") return "bg-red-100 text-red-800";
-    if (s === "confirmed") return "bg-blue-100 text-blue-800";
+    if (s === "delivered") return "bg-[#586330]/10 text-[#586330]";
+    if (s === "returned") return "bg-gray-400/10 text-gray-900";
+    if (s === "confirmed") return "bg-gray-700 text-white";
     if (s === "pending") return "bg-yellow-100 text-yellow-800";
     if (s === "shipped") return "bg-indigo-100 text-indigo-800";
     return "bg-gray-100 text-gray-800";
@@ -302,18 +302,12 @@ export default function OrderPage() {
           <h2 className="text-4xl font-bold text-gray-900 mb-10">
             Delivered Orders Management
           </h2>
-          <button
-            onClick={fetchDeliveredOrders}
-            className="px-6 py-3 bg-[#586330] text-white rounded-lg hover:bg-[#586330]/90 font-medium transition flex items-center gap-2"
-          >
-            <RefreshCw size={18} />
-            Refresh
-          </button>
+         
         </div>
 
         {/* Orders Table */}
         {orders.length === 0 ? (
-          <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300">
+          <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
             <Package size={80} className="mx-auto text-gray-400 mb-6" />
             <p className="text-2xl font-medium text-gray-600">No delivered orders yet</p>
           </div>
@@ -321,7 +315,7 @@ export default function OrderPage() {
           <div className="bg-white rounded-2xl shadow-xl border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-[#586330] text-white">
+                <thead className="border-b border-gray-1 bg-gray-100">
                   <tr>
                     <th className="px-8 py-5 text-left font-semibold">Order ID</th>
                     <th className="px-8 py-5 text-left font-semibold">Customer</th>
@@ -358,7 +352,7 @@ export default function OrderPage() {
                             {isReturned && (
                               <button
                                 onClick={() => openReturnDetails(order)}
-                                className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 shadow-md"
+                                className="px-6 py-3 bg-[#586330] text-white rounded-lg  font-medium flex items-center gap-2 shadow-md"
                               >
                                 <Eye size={18} /> View Return
                               </button>
@@ -366,7 +360,7 @@ export default function OrderPage() {
                             {isConfirmed && (
                               <button
                                 onClick={() => openConfirmedDetails(order)}
-                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 shadow-md"
+                                className="px-6 py-3 bg-gray-700 text-white rounded-lg  font-medium flex items-center gap-2 shadow-md"
                               >
                                 <Eye size={18} /> View Details
                               </button>
@@ -403,7 +397,7 @@ export default function OrderPage() {
                   <button
                     onClick={() => setActiveTab("details")}
                     className={`px-8 py-4 text-lg font-medium transition ${
-                      activeTab === "details" ? "border-b-4 border-red-600 text-red-600" : "text-gray-600 hover:text-gray-900"
+                      activeTab === "details" ? "border-b-4 border-[#586330] text-[#586330]" : "text-gray-600 hover:text-gray-900"
                     }`}
                   >
                     Return Details
@@ -411,7 +405,7 @@ export default function OrderPage() {
                   <button
                     onClick={() => setActiveTab("vendor-shipping")}
                     className={`px-8 py-4 text-lg font-medium transition ${
-                      activeTab === "vendor-shipping" ? "border-b-4 border-purple-600 text-purple-600" : "text-gray-600 hover:text-gray-900"
+                      activeTab === "vendor-shipping" ? "border-b-4 border-[#586330] text-[#586330]" : "text-gray-600 hover:text-gray-900"
                     }`}
                   >
                     <Truck size={20} className="inline mr-2" />
@@ -424,21 +418,21 @@ export default function OrderPage() {
                 {activeTab === "details" && (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-red-50 p-8 rounded-xl text-center border border-red-200">
-                        <p className="text-lg font-medium text-red-700">Return Status</p>
-                        <p className="text-3xl font-bold text-red-900 mt-4">
+                      <div className="bg-gray-400/10 p-8 rounded-xl text-center border border-b">
+                        <p className="text-lg font-medium text-gray-700">Return Status</p>
+                        <p className="text-3xl font-bold text-gray-900 mt-4">
                           {selectedOrder.Status }
                         </p>
                       </div>
-                      <div className="bg-yellow-50 p-8 rounded-xl text-center border border-yellow-200">
-                        <p className="text-lg font-medium text-yellow-700">Customer Refund</p>
-                        <p className="text-3xl font-bold text-yellow-900 mt-4">
+                      <div className="bg-[#586330]  p-8 rounded-xl text-center border border-b">
+                        <p className="text-lg font-medium text-white">Customer Refund</p>
+                        <p className="text-3xl font-bold text-white mt-4">
                           {selectedOrder.RefundStatus || "Pending"}
                         </p>
                       </div>
-                      <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-8 rounded-xl border border-amber-300 text-center">
-                        <p className="text-2xl font-bold mb-2">Refund Amount</p>
-                        <p className="text-5xl font-bold text-red-600">
+                      <div className=" bg-gray-400/10  p-8 rounded-xl text-center border border-b">
+                        <p className="text-lg font-medium text-gray-700">Refund Amount</p>
+                        <p className="text-3xl font-bold text-gray-900 mt-4">
                           ₹{(selectedOrder.TotalAmount)?.toFixed(2)}
                         </p>
                       </div>
@@ -446,9 +440,9 @@ export default function OrderPage() {
 
                     {selectedOrder.Reason && (
                       <div>
-                        <h4 className="text-2xl font-bold text-red-900 mb-4">Customer Return Reason</h4>
-                        <div className="bg-red-50 border-2 border-red-300 p-8 rounded-2xl">
-                          <p className="text-xl italic text-red-800 leading-relaxed">"{selectedOrder.Reason}"</p>
+                        <h4 className="text-2xl font-bold text-[#586330] mb-4">Customer Return Reason</h4>
+                        <div className="bg-[#586330]/10 border-2 border-[#586330] p-8 rounded-2xl">
+                          <p className="text-xl italic text-[#586330] leading-relaxed">"{selectedOrder.Reason}"</p>
                         </div>
                       </div>
                     )}
@@ -469,7 +463,7 @@ export default function OrderPage() {
                             </div>
                             <div className="mt-4 pt-4 border-t border-gray-300 flex justify-between">
                               <span className="text-gray-700 font-medium">Total:</span>
-                              <span className="text-2xl font-bold text-red-600">
+                              <span className="text-2xl font-bold text-[#586330]">
                                 ₹{(item.Quantity * item.Price).toFixed(2)}
                               </span>
                             </div>
@@ -483,7 +477,7 @@ export default function OrderPage() {
                         <button
                           onClick={handleProcessRefund}
                           disabled={processingRefund}
-                          className="px-10 py-5 bg-red-600 text-white text-2xl font-bold rounded-xl hover:bg-red-700 transition flex items-center gap-4 mx-auto disabled:opacity-50 shadow-lg"
+                          className="px-10 py-5 bg-[#586330] text-white text-2xl font-bold rounded-xl  transition flex items-center gap-4 mx-auto disabled:opacity-50 shadow-lg"
                         >
                           {processingRefund ? (
                             <>
@@ -501,9 +495,9 @@ export default function OrderPage() {
                     )}
 
                     {selectedOrder.RefundStatus === "Completed" && (
-                      <div className="bg-green-50 border-2 border-green-300 p-8 rounded-2xl text-center">
-                        <CheckCircle size={80} className="mx-auto text-green-600 mb-4" />
-                        <p className="text-3xl font-bold text-green-900">Refund Completed</p>
+                      <div className="bg-[#586330]/10 border-2 border-[#586330] p-8 rounded-2xl text-center">
+                        <CheckCircle size={80} className="mx-auto text-[#586330] mb-4" />
+                        <p className="text-3xl font-bold text-[#586330]">Refund Completed</p>
                         <p className="text-lg text-gray-700 mt-2">Customer has been refunded successfully.</p>
                       </div>
                     )}
@@ -512,7 +506,7 @@ export default function OrderPage() {
 
               {activeTab === "vendor-shipping" && (
   <div className="max-w-2xl mx-auto">
-    <h3 className="text-3xl font-bold text-purple-900 mb-8 text-center">
+    <h3 className="text-3xl font-bold text-[#586330] mb-8 text-center">
       <Truck size={40} className="inline mr-3" />
       Product Returned to Vendor
     </h3>
@@ -521,19 +515,19 @@ export default function OrderPage() {
     <div className="mb-8">
       <h4 className="text-xl font-bold mb-4">Return Workflow:</h4>
       <div className="flex items-center justify-between mb-2">
-        <div className={`flex items-center ${selectedOrder.Status === "Pending" ? "text-blue-600 font-bold" : "text-gray-400"}`}>
+        <div className={`flex items-center ${selectedOrder.Status === "Pending" ? "text-[#586330] font-bold" : "text-gray-400"}`}>
           <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center mr-2">
             1
           </div>
           <span>Return Requested</span>
         </div>
-        <div className={`flex items-center ${selectedOrder.Status === "Shipped" ? "text-blue-600 font-bold" : "text-gray-400"}`}>
+        <div className={`flex items-center ${selectedOrder.Status === "Shipped" ? "text-[#586330] font-bold" : "text-gray-400"}`}>
           <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center mr-2">
             2
           </div>
           <span>Admin Ships to Vendor</span>
         </div>
-        <div className={`flex items-center ${selectedOrder.Status === "Confirmed" ? "text-blue-600 font-bold" : "text-gray-400"}`}>
+        <div className={`flex items-center ${selectedOrder.Status === "Confirmed" ? "text-[#586330] font-bold" : "text-gray-400"}`}>
           <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center mr-2">
             3
           </div>
@@ -544,10 +538,10 @@ export default function OrderPage() {
 
     {/* Check current status */}
     {selectedOrder.Status === "Shipped" ? (
-      <div className="bg-blue-50 border-2 border-blue-300 rounded-2xl p-8">
+      <div className="bg-[#586330]/10 border-2 border-[#586330] rounded-2xl p-8">
         <div className="text-center mb-6">
-          <Truck size={60} className="mx-auto text-blue-500 mb-4" />
-          <h4 className="text-2xl font-bold text-blue-900 mb-2">Return Shipped to Vendor</h4>
+          <Truck size={60} className="mx-auto text-[#586330] mb-4" />
+          <h4 className="text-2xl font-bold text-[#586330] mb-2">Return Shipped to Vendor</h4>
           <p className="text-gray-600">Waiting for vendor to confirm receipt</p>
         </div>
         
@@ -572,13 +566,13 @@ export default function OrderPage() {
         </div>
       </div>
     ) : selectedOrder.Status === "Confirmed" ? (
-      <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-10 text-center">
-        <CheckCircle size={80} className="mx-auto text-green-600 mb-6" />
-        <h4 className="text-2xl font-bold text-green-900 mb-6">Return Completed</h4>
+      <div className="bg-[#586330]/10 border-2 border-[#586330] rounded-2xl p-10 text-center">
+        <CheckCircle size={80} className="mx-auto text-[#586330] mb-6" />
+        <h4 className="text-2xl font-bold text-[#586330] mb-6">Return Completed</h4>
         <div className="space-y-4 text-lg">
          
           <p className="text-sm text-gray-600 mt-6">
-            Status: <span className="font-medium text-green-700">Confirmed by Vendor</span>
+            Status: <span className="font-medium text-[#586330]">Confirmed by Vendor</span>
           </p>
         </div>
       </div>
@@ -660,12 +654,7 @@ export default function OrderPage() {
               </div>
 
               <div className="p-8 border-t-4 border-gray-300 flex justify-end">
-                <button
-                  onClick={() => setShowReturnModal(false)}
-                  className="px-10 py-4 bg-[#586330] text-white text-xl font-bold rounded-xl hover:bg-[#586330]/90 transition"
-                >
-                  Close
-                </button>
+               
               </div>
             </div>
           </div>
@@ -684,15 +673,15 @@ export default function OrderPage() {
                 <div className="mt-8 flex border-b border-gray-200">
                   <button
                     onClick={() => setConfirmedActiveTab("details")}
-                    className={`px-8 py-4 text-lg font-medium transition ${confirmedActiveTab === "details" ? "border-b-4 border-blue-600 text-blue-600" : "text-gray-600 hover:text-gray-900"}`}
+                    className={`px-8 py-4 text-lg font-medium transition ${confirmedActiveTab === "details" ? "border-b-4 border-[#586330] text-[#586330]" : "text-gray-600 hover:text-gray-900"}`}
                   >
                     Order Details
                   </button>
                   <button
                     onClick={() => setConfirmedActiveTab("vendor-payment")}
-                    className={`px-8 py-4 text-lg font-medium transition ${confirmedActiveTab === "vendor-payment" ? "border-b-4 border-green-600 text-green-600" : "text-gray-600 hover:text-gray-900"}`}
+                    className={`px-8 py-4 text-lg font-medium transition ${confirmedActiveTab === "vendor-payment" ? "border-b-4 border-[#586330] text-[#586330]" : "text-gray-600 hover:text-gray-900"}`}
                   >
-                    <DollarSign size={20} className="inline mr-2" />
+                    
                     Vendor Payment
                   </button>
                 </div>
@@ -702,13 +691,13 @@ export default function OrderPage() {
                 {confirmedActiveTab === "details" && (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="bg-blue-50 p-8 rounded-2xl text-center border border-blue-200">
+                      <div className="bg-gray-400/10 p-8 rounded-2xl text-center border border-gray-900">
                         <p className="text-lg font-medium">Confirmation Status</p>
-                        <p className="text-3xl font-bold mt-4 text-blue-900">Confirmed</p>
+                        <p className="text-3xl font-bold mt-4 text-gray-900">Confirmed</p>
                       </div>
-                      <div className="bg-green-50 p-8 rounded-2xl text-center border border-green-200">
-                        <p className="text-lg font-medium text-green-700">Vendor Payment</p>
-                        <p className="text-3xl font-bold text-green-900 mt-4">
+                      <div className="bg-[#586330]/10 p-8 rounded-2xl text-center border border-[#586330]">
+                        <p className="text-lg font-medium text-[#586330]">Vendor Payment</p>
+                        <p className="text-3xl font-bold text-[#586330] mt-4">
                           {selectedOrder.VendorPaymentStatus === "Paid" ? "Paid" : "Pending"}
                         </p>
                       </div>
@@ -741,8 +730,8 @@ export default function OrderPage() {
                       </div>
                     </div>
 
-                    <div className="bg-blue-50 border-2 border-blue-300 p-6 rounded-2xl">
-                      <h4 className="text-xl font-bold mb-3">✅ Order Confirmed</h4>
+                    <div className="bg-[#586330]/10 border-2 border-[#586330] p-6 rounded-2xl">
+                      <h4 className="text-xl font-medium mb-3"> Order Confirmed</h4>
                       <p className="text-lg">
                         Customer has accepted the order (active confirmation or return window expired).
                       </p>
@@ -752,20 +741,20 @@ export default function OrderPage() {
 
                 {confirmedActiveTab === "vendor-payment" && (
                   <div className="max-w-3xl mx-auto">
-                    <h3 className="text-3xl font-bold text-green-900 mb-10 text-center">
-                      <DollarSign size={40} className="inline mr-3" />
+                    <h3 className="text-3xl font-bold text-[#586330] mb-10 text-center">
+                     ₹
                       Vendor Payout
                     </h3>
 
                     {selectedOrder.VendorPaymentStatus === "Paid" ? (
-                      <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-12 text-center">
-                        <CheckCircle size={100} className="mx-auto text-green-600 mb-6" />
-                        <h4 className="text-3xl font-bold text-green-900 mb-6">Vendor Payment Completed</h4>
+                      <div className="bg-[#586330]/10 border-2 border-[#586330] rounded-2xl p-12 text-center">
+                        <CheckCircle size={90} className="mx-auto text- mb-6 " />
+                        <h4 className="text-3xl font-bold text-[#586330] mb-6">Vendor Payment Completed</h4>
                         <div className="space-y-4 text-xl">
-                          <p>Paid to Vendor: <strong className="text-green-800">
+                          <p>Paid to Vendor: <strong className="text-[#586330]">
                             ₹{parseFloat(selectedOrder.VendorPayoutAmount || 0).toFixed(2)}
                           </strong></p>
-                          <p>Platform Commission: <strong className="text-orange-800">
+                          <p>Platform Commission: <strong className="text-gray-700">
                             ₹{parseFloat(selectedOrder.CommissionAmount || 0).toFixed(2)}
                           </strong></p>
                           {selectedOrder.VendorPayoutDate && (
@@ -822,14 +811,7 @@ export default function OrderPage() {
                   </div>
                 )}
 
-                <div className="pt-8 border-t-4 border-gray-300 flex justify-end">
-                  <button
-                    onClick={() => setShowConfirmedModal(false)}
-                    className="px-10 py-4 bg-[#586330] text-white text-xl font-bold rounded-xl hover:bg-[#586330]/90 transition"
-                  >
-                    Close
-                  </button>
-                </div>
+                
               </div>
             </div>
           </div>

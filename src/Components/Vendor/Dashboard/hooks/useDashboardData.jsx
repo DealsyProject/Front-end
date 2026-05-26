@@ -15,7 +15,11 @@ export const useDashboardData = (navigate) => {
   const fetchNotifications = useCallback(async () => {
     try {
       console.log('🔔 [Dashboard] Fetching notifications from API...');
-      
+      const token = localStorage.getItem('authToken');
+if (!token) {
+  console.warn("No token, skipping API call");
+  return;
+}
       const notificationResponse = await axiosInstance.get('/Notification/vendor-out-of-stock');
     
       let notificationsArray = [];

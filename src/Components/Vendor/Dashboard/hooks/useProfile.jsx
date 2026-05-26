@@ -24,6 +24,11 @@ export const useProfile = (setShowProfile, fetchDashboardData) => {
     const loadCategories = async () => {
       try {
         console.log('🔄 Loading categories...');
+        const token = localStorage.getItem('authToken');
+if (!token) {
+  console.warn("No token, skipping API call");
+  return;
+}
         const response = await axiosInstance.get('/category/names');
         console.log('📦 Categories response:', response.data);
         

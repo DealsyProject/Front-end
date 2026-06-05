@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-  baseURL: 'https://localhost:7001/api',
+  baseURL: 'https://dealsy-backend-api.onrender.com',
   timeout: 120000,
   headers: { 'Content-Type': 'application/json' },
 });

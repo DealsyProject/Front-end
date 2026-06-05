@@ -22,7 +22,7 @@ export default function CustomerHome() {
   }, [location]);
 
   const brands = [
-    "/TrustedLogos/Logo1.png",
+    "/TrustedLogos/logo1.png",
     "/TrustedLogos/logo2.png",
     "/TrustedLogos/logo3.png",
     "/TrustedLogos/logo4.png",

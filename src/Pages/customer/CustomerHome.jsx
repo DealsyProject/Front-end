@@ -22,10 +22,14 @@ export default function CustomerHome() {
   }, [location]);
 
   const brands = [
-    "public/Trusted Logos/Logo1.png", "public/Trusted Logos/logo2.png",
-    "public/Trusted Logos/logo3.png", "public/Trusted Logos/logo4.png",
-    "public/Trusted Logos/logo5.png", "public/Trusted Logos/logo6.png"
+    "/TrustedLogos/Logo1.png",
+    "/TrustedLogos/logo2.png",
+    "/TrustedLogos/logo3.png",
+    "/TrustedLogos/logo4.png",
+    "/TrustedLogos/logo5.png",
+    "/TrustedLogos/logo6.png",
   ];
+ 
 
   return (
     <div className="bg-white min-h-screen">
@@ -41,7 +45,7 @@ export default function CustomerHome() {
         <div className="relative z-10 w-full flex justify-center pb-0 pt-2">
           <div className="bg-black overflow-hidden border-t-10 border-x-10 border-b-0 border-black w-[35vw] max-w-3xl min-w-[350px] rounded-t-xl rounded-b-none">
             <img
-              src="public/homepics/browseSection.png"
+              src="/homepics/browseSection.png"
               alt="Product Display"
               className="block w-full h-80 md:h-80 object-cover rounded-t-xl rounded-b-none"
             />
